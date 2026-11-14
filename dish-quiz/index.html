@@ -3,156 +3,173 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Which Gambian Dish Are You? · PK Arcade</title>
+  <title>Which Gambian Dish Are You? - PK Arcade</title>
   <meta name="description" content="Domoda, benachin or superkanja? Eight questions to find your Gambian dish.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍲</text></svg>">
+  <meta name="theme-color" content="#130b33">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml">
+  <script src="../assets/theme.js"></script>
   <link rel="stylesheet" href="../assets/style.css">
   <style>
     main { max-width: 620px; }
-    .progress { height: 10px; background: #eadfca; border-radius: 9px; overflow: hidden; margin: 6px 0 18px; }
-    .progress i { display: block; height: 100%; background: var(--green); transition: width .3s; }
-    .q { font: 800 clamp(1.4rem, 5vw, 1.9rem) var(--display); line-height: 1.15; margin: 0 0 16px; }
-    .ans { display: grid; gap: 10px; }
+    .steps { display: flex; gap: 6px; margin: 4px 0 20px; }
+    .steps i { flex: 1; height: 12px; background: var(--bg-2); border: 2px solid var(--line); }
+    .steps i.done { background: var(--green); }
+    .steps i.cur { background: var(--yellow); }
+    .q { font: clamp(.8rem, 3.6vw, 1rem)/1.6 var(--display); margin: 0 0 20px; }
+    .ans { display: grid; gap: 14px; }
     .ans button {
-      text-align: left; font: 600 1.02rem var(--body); padding: 16px 18px; border-radius: 14px; border: 0;
-      background: var(--card); box-shadow: var(--shadow); cursor: pointer; color: var(--ink);
-      transition: transform .1s, background .1s;
+      text-align: left; font: 1.5rem/1.15 var(--body); padding: 14px 16px; cursor: pointer; color: var(--ink);
+      background: var(--panel); border: var(--px) solid var(--line); box-shadow: var(--px) var(--px) 0 var(--shadow);
     }
-    .ans button:hover { transform: translateX(4px); background: #fff; }
-    .ans button .e { font-size: 1.3rem; margin-right: 8px; }
-    .fade { animation: fade .35s ease; }
-    @keyframes fade { from { opacity: 0; transform: translateY(8px); } }
+    .ans button:hover { background: var(--yellow); color: var(--on-accent); }
+    .ans button:active { transform: translate(var(--px), var(--px)); box-shadow: none; }
     #result { display: none; text-align: center; }
-    #cardCanvas { width: 100%; max-width: 420px; border-radius: 18px; box-shadow: var(--shadow); }
-    .also { margin-top: 16px; }
-    .also span { display: inline-block; background: var(--card); padding: 6px 12px; border-radius: 999px; margin: 3px; box-shadow: var(--shadow); font-size: .9rem; }
+    #cardCanvas { width: 100%; max-width: 420px; border: var(--px) solid var(--line); box-shadow: calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--shadow); image-rendering: pixelated; }
+    .also { margin-top: 18px; }
+    .also span { display: inline-block; border: 3px solid var(--line); background: var(--panel); padding: 4px 10px; margin: 4px; }
   </style>
 </head>
-<body>
-  <div class="flag"></div>
-  <header class="topbar">
-    <a class="back" href="../">← Arcade</a>
-    <h1>Which Gambian Dish Are You? 🍲</h1>
-  </header>
+<body data-title="Which Dish Are You?">
   <main>
     <section id="quiz">
-      <div class="muted" id="count"></div>
-      <div class="progress"><i id="prog"></i></div>
+      <div class="steps" id="steps"></div>
       <div id="qbox"></div>
     </section>
     <section id="result">
       <canvas id="cardCanvas" width="840" height="1050"></canvas>
-      <div class="row" style="justify-content:center;margin-top:16px">
+      <div class="row" style="justify-content:center;margin-top:20px">
         <button class="btn green" id="share">Share</button>
-        <button class="btn" id="save">Save image</button>
-        <button class="btn ghost" id="again">Retake</button>
+        <button class="btn" id="save">Save picture</button>
+        <button class="btn ghost" id="again">Take it again</button>
       </div>
       <div class="also" id="also"></div>
     </section>
   </main>
 
   <script src="../assets/common.js"></script>
+  <script src="../assets/icons.js"></script>
   <script>
     const DISHES = {
-      domoda:     { name: "Domoda", emoji: "🥜", color: "#b5651d",
-        desc: "Rich groundnut stew - warm, comforting and loved by everyone. You're the friend who brings people together, and everyone feels at home around you." },
-      benachin:   { name: "Benachin", emoji: "🍛", color: "#d2491b",
+      domoda:     { name: "Domoda", color: "#b5651d",
+        desc: "Rich groundnut stew: warm, comforting and loved by everyone. You bring people together, and everyone feels at home around you." },
+      benachin:   { name: "Benachin", color: "#d2491b",
         desc: "One-pot rice cooked with everything. Colourful, generous and the life of every party. You mix with everyone and somehow it always works." },
-      superkanja: { name: "Superkanja", emoji: "🌶️", color: "#3a7728",
-        desc: "Okra and palm oil with fish - bold and a little wild. Not everyone can handle you, but the people who do would never trade you." },
-      yassa:      { name: "Yassa", emoji: "🍋", color: "#c9a10a",
-        desc: "Onions, lemon and mustard with chicken or fish. Sharp, zesty and honest - you say what you think and people respect you for it." },
-      afra:       { name: "Afra", emoji: "🔥", color: "#7d1d14",
-        desc: "Grilled meat from the night stand, eaten with onions and pepper. A night owl and a social butterfly - wherever the music is, you're there." },
-      plasas:     { name: "Plasas", emoji: "🥬", color: "#1f5a3a",
+      superkanja: { name: "Superkanja", color: "#2c7a3a",
+        desc: "Okra and palm oil with fish. Bold and a little wild. Not everyone can handle you, but the people who can would never trade you." },
+      yassa:      { name: "Yassa", color: "#b8900a",
+        desc: "Onions, lemon and mustard. Sharp, zesty and honest. You say what you think, and people respect you for it." },
+      afra:       { name: "Afra", color: "#8f2218",
+        desc: "Grilled meat from the night stand, with onions and pepper. A night owl. Wherever the music is, you are there." },
+      plasas:     { name: "Plasas", color: "#1f5a3a",
         desc: "Leafy greens slow-cooked in palm oil. Deep, traditional and wise beyond your years. The elders trust you." },
-      mbahal:     { name: "Mbahal", emoji: "🐟", color: "#5b4636",
-        desc: "Rice with smoked fish and groundnuts - humble, practical and underrated. People keep finding out you're better than they thought." },
-      chere:      { name: "Chereh", emoji: "🌾", color: "#a0782c",
-        desc: "Steamed millet couscous, made with patience. Calm, steady and a morning person - you show up for every big occasion." },
+      mbahal:     { name: "Mbahal", color: "#5b4636",
+        desc: "Rice with smoked fish and groundnuts. Humble, practical and underrated. People keep finding out you are better than they thought." },
+      chere:      { name: "Chereh", color: "#96701f",
+        desc: "Steamed millet couscous, made with patience. Calm, steady and a morning person. You show up for every big occasion." },
     };
 
-    // Each answer gives points to one or two dishes.
+    // Each answer gives points to one or two dishes. Eight of these are picked for each run.
     const QUESTIONS = [
       { q: "It's Saturday morning. What are you doing?", a: [
-        ["☕", "Already up, sitting quietly with breakfast", { chere: 2, plasas: 1 }],
-        ["😴", "Still sleeping - it was a late night", { afra: 2, superkanja: 1 }],
-        ["🧹", "Cleaning and running errands for the family", { domoda: 2, mbahal: 1 }],
-        ["📱", "Planning where everyone is going today", { benachin: 2, yassa: 1 }],
-      ]},
-      { q: "Pick a place to spend the afternoon", a: [
-        ["🏖️", "Kotu or Cape Point beach with friends", { benachin: 2, afra: 1 }],
-        ["🌳", "Under the mango tree at the compound", { domoda: 2, chere: 1 }],
-        ["🛒", "Serrekunda market, bargaining hard", { yassa: 2, superkanja: 1 }],
-        ["🚣", "On the river or a quiet trip upcountry", { plasas: 2, mbahal: 1 }],
-      ]},
-      { q: "Your friends describe you as...", a: [
-        ["🤗", "The one who looks after everyone", { domoda: 2, plasas: 1 }],
-        ["🎉", "The fun one", { benachin: 2, afra: 1 }],
-        ["🗣️", "The honest one", { yassa: 2, superkanja: 1 }],
-        ["🧘", "The calm one", { chere: 2, mbahal: 1 }],
-      ]},
+        ["Already up, sitting quietly with breakfast", { chere: 2, plasas: 1 }],
+        ["Still sleeping. It was a late night", { afra: 2, superkanja: 1 }],
+        ["Cleaning and running errands for the family", { domoda: 2, mbahal: 1 }],
+        ["Planning where everyone is going today", { benachin: 2, yassa: 1 }] ] },
+      { q: "Pick a place to spend the afternoon.", a: [
+        ["Kotu or Cape Point beach with friends", { benachin: 2, afra: 1 }],
+        ["Under the mango tree at the compound", { domoda: 2, chere: 1 }],
+        ["Serrekunda market, bargaining hard", { yassa: 2, superkanja: 1 }],
+        ["On the river, or a quiet trip upcountry", { plasas: 2, mbahal: 1 }] ] },
+      { q: "Your friends say you are...", a: [
+        ["The one who looks after everyone", { domoda: 2, plasas: 1 }],
+        ["The fun one", { benachin: 2, afra: 1 }],
+        ["The honest one", { yassa: 2, superkanja: 1 }],
+        ["The calm one", { chere: 2, mbahal: 1 }] ] },
       { q: "How do you take your ataya?", a: [
-        ["🍬", "Third round only - sweet, sweet, sweet", { benachin: 1, domoda: 2 }],
-        ["🍃", "First round, strong and bitter", { superkanja: 2, plasas: 1 }],
-        ["🌿", "Lots of mint, please", { yassa: 2, chere: 1 }],
-        ["⏳", "I'm the one brewing it all night", { afra: 2, mbahal: 1 }],
-      ]},
-      { q: "Pick some music", a: [
-        ["🥁", "Sabar - loud and on my feet", { superkanja: 2, afra: 1 }],
-        ["🎶", "Kora, nice and peaceful", { plasas: 2, chere: 1 }],
-        ["🎤", "Afrobeats or mbalax at the party", { benachin: 2, yassa: 1 }],
-        ["📻", "Whatever my grandma is playing on the radio", { domoda: 1, mbahal: 2 }],
-      ]},
-      { q: "There's a family wedding. Your job?", a: [
-        ["🍳", "In the kitchen with the big pots", { domoda: 2, chere: 1 }],
-        ["💃", "Leading the dancing", { afra: 1, benachin: 2 }],
-        ["📋", "Organising everything and everyone", { yassa: 2, mbahal: 1 }],
-        ["🎁", "Showing up with the best outfit and a gift", { superkanja: 1, plasas: 2 }],
-      ]},
+        ["Third round only: sweet, sweet, sweet", { domoda: 2, benachin: 1 }],
+        ["First round, strong and bitter", { superkanja: 2, plasas: 1 }],
+        ["Lots of mint, please", { yassa: 2, chere: 1 }],
+        ["I'm the one brewing it all night", { afra: 2, mbahal: 1 }] ] },
+      { q: "Pick some music.", a: [
+        ["Sabar, loud, and I'm on my feet", { superkanja: 2, afra: 1 }],
+        ["Kora, nice and peaceful", { plasas: 2, chere: 1 }],
+        ["Afrobeats or mbalax at the party", { benachin: 2, yassa: 1 }],
+        ["Whatever grandma has on the radio", { mbahal: 2, domoda: 1 }] ] },
+      { q: "There's a family wedding. What is your job?", a: [
+        ["In the kitchen with the big pots", { domoda: 2, chere: 1 }],
+        ["Leading the dancing", { benachin: 2, afra: 1 }],
+        ["Organising everything and everyone", { yassa: 2, mbahal: 1 }],
+        ["Arriving in the best outfit with a gift", { plasas: 2, superkanja: 1 }] ] },
       { q: "How spicy?", a: [
-        ["🔥", "Kaani on everything", { superkanja: 2, afra: 2 }],
-        ["🌶️", "A little bit, for flavour", { yassa: 2, benachin: 1 }],
-        ["😅", "No thank you", { domoda: 2, chere: 1 }],
-        ["🤔", "Depends on who's cooking", { mbahal: 2, plasas: 1 }],
-      ]},
-      { q: "Your dream for the future?", a: [
-        ["🏠", "A big house with the whole family together", { domoda: 2, plasas: 1 }],
-        ["✈️", "Travel the world and come back with stories", { benachin: 2, yassa: 1 }],
-        ["💼", "My own business, my own rules", { superkanja: 1, mbahal: 2 }],
-        ["🌙", "A peaceful, simple life", { chere: 2, afra: 1 }],
-      ]},
+        ["Kaani on everything", { superkanja: 2, afra: 2 }],
+        ["A little, for flavour", { yassa: 2, benachin: 1 }],
+        ["No thank you", { domoda: 2, chere: 1 }],
+        ["Depends who is cooking", { mbahal: 2, plasas: 1 }] ] },
+      { q: "What is your dream for the future?", a: [
+        ["A big house with the whole family together", { domoda: 2, plasas: 1 }],
+        ["Travel the world and come back with stories", { benachin: 2, yassa: 1 }],
+        ["My own business, my own rules", { mbahal: 2, superkanja: 1 }],
+        ["A peaceful, simple life", { chere: 2, afra: 1 }] ] },
+      { q: "The gele-gele is full. What do you do?", a: [
+        ["Squeeze in. There is always space", { benachin: 2, mbahal: 1 }],
+        ["Wait calmly for the next one", { chere: 2, plasas: 1 }],
+        ["Argue with the apprentice about the fare", { yassa: 2, superkanja: 1 }],
+        ["Call a friend with a car", { afra: 2, domoda: 1 }] ] },
+      { q: "NAWEC takes the light at night. You...", a: [
+        ["Tell stories with the family outside", { domoda: 2, plasas: 1 }],
+        ["Go out. The night is just starting", { afra: 2, benachin: 1 }],
+        ["Complain loudly, then light a candle", { yassa: 2, superkanja: 1 }],
+        ["Sleep early. No problem", { chere: 2, mbahal: 1 }] ] },
+      { q: "Pick a season.", a: [
+        ["Rainy season: green everywhere", { plasas: 2, chere: 1 }],
+        ["December, when everyone comes home", { benachin: 2, afra: 1 }],
+        ["Mango season", { domoda: 2, yassa: 1 }],
+        ["Harmattan mornings, cool and dusty", { mbahal: 2, superkanja: 1 }] ] },
+      { q: "A friend asks to borrow money. You...", a: [
+        ["Give it, no questions", { domoda: 2, benachin: 1 }],
+        ["Ask exactly when it is coming back", { yassa: 2, mbahal: 1 }],
+        ["Give advice instead", { plasas: 2, chere: 1 }],
+        ["Say I'm broke too, let's go out anyway", { afra: 2, superkanja: 1 }] ] },
     ];
+    const N = 8;
+    let run, i, scores;
 
-    let i = 0, scores = {};
+    function begin() {
+      run = shuffle(QUESTIONS).slice(0, N); i = 0; scores = {};
+      document.getElementById("result").style.display = "none";
+      document.getElementById("quiz").style.display = "block";
+      render();
+    }
 
     function render() {
-      const Q = QUESTIONS[i];
-      document.getElementById("count").textContent = `Question ${i + 1} of ${QUESTIONS.length}`;
-      document.getElementById("prog").style.width = (100 * i / QUESTIONS.length) + "%";
+      const Q = run[i];
+      document.getElementById("steps").innerHTML = run.map((_, k) => `<i class="${k < i ? "done" : k === i ? "cur" : ""}"></i>`).join("");
       const box = document.getElementById("qbox");
-      box.className = "fade";
-      void box.offsetWidth;
-      box.innerHTML = `<p class="q">${Q.q}</p><div class="ans">${shuffle(Q.a).map(([e, t]) =>
-        `<button data-t="${t.replace(/"/g, "&quot;")}"><span class="e">${e}</span>${t}</button>`).join("")}</div>`;
-      box.querySelectorAll("button").forEach(b => b.onclick = () => {
-        const pts = Q.a.find(a => a[1] === b.dataset.t)[2];
-        for (const k in pts) scores[k] = (scores[k] || 0) + pts[k];
-        i++;
-        i < QUESTIONS.length ? render() : finish();
+      box.innerHTML = `<p class="q">${Q.q}</p><div class="ans"></div>`;
+      shuffle(Q.a).forEach(([text, pts]) => {
+        const b = document.createElement("button");
+        b.textContent = text;
+        b.onclick = () => {
+          sfx.ok();
+          for (const k in pts) scores[k] = (scores[k] || 0) + pts[k];
+          i++;
+          i < N ? render() : finish();
+        };
+        box.querySelector(".ans").appendChild(b);
       });
     }
 
     function finish() {
-      document.getElementById("prog").style.width = "100%";
       const ranked = Object.keys(DISHES).sort((a, b) => (scores[b] || 0) - (scores[a] || 0) || Math.random() - .5);
       const top = DISHES[ranked[0]];
       drawCard(top);
-      document.getElementById("also").innerHTML = `<p class="muted" style="margin:8px 0 4px">You're also a bit of...</p>` +
-        ranked.slice(1, 3).map(k => `<span>${DISHES[k].emoji} ${DISHES[k].name}</span>`).join("");
+      document.getElementById("also").innerHTML = `<p class="muted" style="margin-bottom:6px">You are also a bit of</p>` +
+        ranked.slice(1, 3).map(k => `<span>${DISHES[k].name}</span>`).join("");
       document.getElementById("quiz").style.display = "none";
       document.getElementById("result").style.display = "block";
-      const text = `🍲 I'm ${top.name}! ${top.emoji}\n"${top.desc}"\nWhich Gambian dish are you? ${location.href}`;
+      sfx.win(); confetti();
+      const text = `I'm ${top.name}!\n"${top.desc}"\nWhich Gambian dish are you? ${location.href}`;
       document.getElementById("share").onclick = () => shareText(text);
       document.getElementById("save").onclick = () => {
         const a = document.createElement("a");
@@ -163,45 +180,42 @@
     }
 
     function drawCard(d) {
-      const c = document.getElementById("cardCanvas"), x = c.getContext("2d");
-      const W = c.width, H = c.height;
+      const c = document.getElementById("cardCanvas"), x = c.getContext("2d"), W = c.width, H = c.height;
       x.fillStyle = d.color; x.fillRect(0, 0, W, H);
-      // pattern of soft circles
-      x.fillStyle = "rgba(255,255,255,.08)";
-      for (let k = 0; k < 14; k++) { x.beginPath(); x.arc((k * 173) % W, (k * 251) % H, 60 + (k * 37) % 120, 0, Math.PI * 2); x.fill(); }
-      // flag stripe
-      [["#ce1126", 0, 20], ["#fff", 20, 6], ["#0c1c8c", 26, 20], ["#fff", 46, 6], ["#3a7728", 52, 20]]
+      x.fillStyle = "rgba(0,0,0,.12)";                               // chunky checker pattern
+      for (let yy = 0; yy < H; yy += 60) for (let xx = (yy / 60) % 2 ? 0 : 60; xx < W; xx += 120) x.fillRect(xx, yy, 60, 60);
+      [["#ff4458", 0, 30], ["#f8f0d8", 30, 8], ["#4f8bff", 38, 30], ["#f8f0d8", 68, 8], ["#2fe38c", 76, 30]]
         .forEach(([col, y, h]) => { x.fillStyle = col; x.fillRect(0, y, W, h); });
-      x.textAlign = "center"; x.fillStyle = "#fff";
-      x.font = "600 38px Inter, sans-serif";
-      x.fillText("I'm", W / 2, 190);
-      x.font = "200px serif";
-      x.fillText(d.emoji, W / 2, 420);
-      x.font = "800 120px 'Baloo 2', sans-serif";
-      x.fillText(d.name, W / 2, 560);
-      x.font = "500 34px Inter, sans-serif";
-      wrap(x, d.desc, W / 2, 650, W - 140, 48);
-      x.font = "600 28px Inter, sans-serif"; x.globalAlpha = .8;
-      x.fillText("Which Gambian dish are you? · PK Arcade", W / 2, H - 50);
-      x.globalAlpha = 1;
+      // the bowl, from the same pixel art as the home page
+      const art = GAME_ICONS.dish, s = 26, ox = (W - 12 * s) / 2, oy = 190;
+      const pal = { r: "#f8f0d8", y: "#ffd23f", i: "#f8f0d8" };
+      art.forEach((row, ry) => [...row].forEach((ch, rx) => { if (ch !== ".") { x.fillStyle = pal[ch]; x.fillRect(ox + rx * s, oy + ry * s, s, s); } }));
+      x.textAlign = "center"; x.fillStyle = "#f8f0d8";
+      x.font = "34px 'Press Start 2P'"; x.fillText("I am", W / 2, 160);
+      let size = 84;
+      x.font = `${size}px 'Press Start 2P'`;
+      while (x.measureText(d.name).width > W - 80) { size -= 6; x.font = `${size}px 'Press Start 2P'`; }
+      x.fillStyle = "#05021a"; x.fillText(d.name, W / 2 + 8, 640 + 8);
+      x.fillStyle = "#ffd23f"; x.fillText(d.name, W / 2, 640);
+      x.fillStyle = "#f8f0d8"; x.font = "46px 'VT323'";
+      wrap(x, d.desc, W / 2, 730, W - 120, 48);
+      x.font = "22px 'Press Start 2P'";
+      x.fillText("pk-arcade.pages.dev", W / 2, H - 50);
     }
 
     function wrap(x, text, cx, y, maxW, lh) {
-      const words = text.split(" "); let line = "";
-      for (const w of words) {
+      let line = "";
+      for (const w of text.split(" ")) {
         const t = line ? line + " " + w : w;
         if (x.measureText(t).width > maxW) { x.fillText(line, cx, y); y += lh; line = w; } else line = t;
       }
       x.fillText(line, cx, y);
+      return y;
     }
 
-    document.getElementById("again").onclick = () => {
-      i = 0; scores = {};
-      document.getElementById("result").style.display = "none";
-      document.getElementById("quiz").style.display = "block";
-      render();
-    };
-    document.fonts.ready.then(render);
+    document.getElementById("again").onclick = begin;
+    // make sure both fonts are ready before anything is drawn on the card
+    Promise.all([document.fonts.load("20px 'Press Start 2P'"), document.fonts.load("20px 'VT323'")]).then(begin, begin);
   </script>
 </body>
 </html>

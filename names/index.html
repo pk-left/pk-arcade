@@ -3,66 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gambian Name Meanings · PK Arcade</title>
-  <meta name="description" content="What does Lamin, Isatou or Ebrima mean? Look up Gambian names and make a card.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔤</text></svg>">
+  <title>Gambian Name Meanings - PK Arcade</title>
+  <meta name="description" content="What does Lamin, Isatou or Kumba mean? Look up Gambian names and make a card.">
+  <meta name="theme-color" content="#130b33">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml">
+  <script src="../assets/theme.js"></script>
   <link rel="stylesheet" href="../assets/style.css">
   <style>
-    main { max-width: 680px; }
-    .search { display: flex; gap: 8px; margin: 6px 0 14px; }
-    .search input {
-      flex: 1; min-width: 0; font: 700 1.3rem var(--display); padding: 12px 18px; border-radius: 999px;
-      border: 2px solid #d8ccb5; background: var(--card); outline: none;
-    }
-    .search input:focus { border-color: var(--blue); }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
-    .chips button { border: 0; background: var(--card); box-shadow: var(--shadow); padding: 6px 12px; border-radius: 999px; cursor: pointer; font: 600 .9rem var(--body); }
+    main { max-width: 640px; }
+    .search { display: flex; gap: 10px; margin: 4px 0 16px; }
+    .search input { flex: 1; font-size: 1.8rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .chips button { font: 1.35rem var(--body); color: var(--ink); background: var(--bg-2); border: 3px solid var(--line); padding: 2px 10px; cursor: pointer; }
+    .chips button:hover { background: var(--yellow); color: var(--on-accent); }
     #out { display: none; text-align: center; }
-    canvas { width: 100%; max-width: 480px; border-radius: 18px; box-shadow: var(--shadow); }
-    .miss { text-align: center; }
+    #cv { width: 100%; max-width: 440px; border: var(--px) solid var(--line); box-shadow: calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--shadow); }
+    #miss { display: none; }
+    #miss h3 { margin-bottom: 12px; line-height: 1.6; }
   </style>
 </head>
-<body>
-  <div class="flag"></div>
-  <header class="topbar">
-    <a class="back" href="../">← Arcade</a>
-    <h1>Name Meanings 🔤</h1>
-  </header>
+<body data-title="Name Meanings">
   <main>
-    <p class="muted" style="margin-top:0">Type a Gambian first name to see where it comes from and what it means, then save a card.</p>
+    <p>Type a Gambian first name to see where it comes from and what it means.</p>
     <form class="search" id="f">
-      <input id="q" placeholder="e.g. Lamin, Isatou, Ebou" autocomplete="off" list="dl">
-      <button class="btn">Go</button>
+      <input id="q" placeholder="Lamin, Isatou, Kumba" autocomplete="off" autocapitalize="words" aria-label="First name">
+      <button class="btn">Look up</button>
     </form>
-    <datalist id="dl"></datalist>
     <div class="chips" id="chips"></div>
     <div id="out">
       <canvas id="cv" width="960" height="1200"></canvas>
-      <div class="row" style="justify-content:center;margin-top:14px">
+      <div class="row" style="justify-content:center;margin-top:18px">
         <button class="btn green" id="share">Share</button>
-        <button class="btn" id="save">Save image</button>
+        <button class="btn" id="save">Save picture</button>
       </div>
     </div>
-    <div class="miss card" id="miss" style="display:none"></div>
+    <div class="panel" id="miss"></div>
   </main>
 
   <script src="../assets/common.js"></script>
   <script src="names.js"></script>
   <script>
-    const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z']/g, "");
-    // index every spelling
-    const index = new Map();
+    const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+    const index = new Map();                       // every spelling points at its entry
     for (const n of NAMES) {
       index.set(norm(n[0]), n);
       n[1].split(",").forEach(v => { const k = norm(v); if (k && !index.has(k)) index.set(k, n); });
     }
-    document.getElementById("dl").innerHTML = NAMES.map(n => `<option value="${n[0]}">`).join("");
-    document.getElementById("chips").innerHTML = shuffle(NAMES).slice(0, 10)
-      .map(n => `<button type="button">${n[0]}</button>`).join("");
-    document.getElementById("chips").onclick = e => { if (e.target.tagName === "BUTTON") lookup(e.target.textContent); };
+    const chips = document.getElementById("chips");
+    chips.innerHTML = shuffle(NAMES).slice(0, 12).map(n => `<button type="button">${n[0]}</button>`).join("");
+    chips.onclick = e => { if (e.target.tagName === "BUTTON") { sfx.click(); lookup(e.target.textContent); } };
     document.getElementById("f").onsubmit = e => { e.preventDefault(); lookup(document.getElementById("q").value); };
 
-    const PALETTES = [["#0c1c8c", "#2c3fd1"], ["#ce1126", "#e8505e"], ["#3a7728", "#5fa548"], ["#7a3e9d", "#a466c7"], ["#b5651d", "#d98a3f"]];
+    const INKS = [["#241663", "#ffd23f"], ["#8f1226", "#ffd23f"], ["#0f5c36", "#f8f0d8"], ["#1f3fb0", "#ffd23f"], ["#7a3b0c", "#f8f0d8"]];
 
     function lookup(raw) {
       const typed = raw.trim();
@@ -72,17 +65,18 @@
       const out = document.getElementById("out"), miss = document.getElementById("miss");
       history.replaceState(null, "", "#" + encodeURIComponent(typed));
       if (!hit) {
+        sfx.bad();
         out.style.display = "none"; miss.style.display = "block";
-        miss.innerHTML = `<h3 style="margin-top:0">"${typed.replace(/</g, "&lt;")}" isn't in the list yet 🤔</h3>
-          <p class="muted">Know what it means? Tell PK so it can be added.</p>
-          <a class="btn" href="https://github.com/pk-left/pk-arcade/issues/new?title=${encodeURIComponent("Add name: " + typed)}">Suggest it</a>`;
+        miss.innerHTML = `<h3></h3><p>That name isn't in the list yet. If you know what it means, send it in and it will be added.</p>
+          <a class="btn" target="_blank" rel="noopener" href="https://github.com/pk-left/pk-arcade/issues/new?title=${encodeURIComponent("Add name: " + typed)}">Suggest this name</a>`;
+        miss.querySelector("h3").textContent = `No entry for "${typed}"`;
         return;
       }
+      sfx.coin();
       miss.style.display = "none"; out.style.display = "block";
-      // show the spelling the person typed if it's one of the known variants
       const display = typed[0].toUpperCase() + typed.slice(1);
       drawCard(display, hit);
-      const text = `🔤 ${display}: ${hit[3]} (${hit[2]})\nLook up your name: ${location.origin}${location.pathname}`;
+      const text = `${display}: ${hit[3]} (${hit[2]})\nLook up your name: ${location.origin}${location.pathname}`;
       document.getElementById("share").onclick = () => shareText(text);
       document.getElementById("save").onclick = () => {
         const a = document.createElement("a");
@@ -95,36 +89,29 @@
 
     function drawCard(display, n) {
       const c = document.getElementById("cv"), x = c.getContext("2d"), W = c.width, H = c.height;
-      let h = 0; for (const ch of display) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-      const [a, b] = PALETTES[h % PALETTES.length];
-      const g = x.createLinearGradient(0, 0, W, H);
-      g.addColorStop(0, a); g.addColorStop(1, b);
-      x.fillStyle = g; x.fillRect(0, 0, W, H);
-      // generative kente-like strips seeded by the name
-      const rand = seededRandom(h);
-      x.globalAlpha = .13; x.fillStyle = "#fff";
-      for (let i = 0; i < 18; i++) {
-        const y = rand() * H, hh = 8 + rand() * 40;
-        x.fillRect(0, y, W, hh);
-        for (let k = 0; k < 12; k++) x.fillRect(rand() * W, y - 10, 20 + rand() * 50, hh + 20);
+      let h = 0; for (const ch of display.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const [bg, accent] = INKS[h % INKS.length], rand = seededRandom(h);
+      x.fillStyle = bg; x.fillRect(0, 0, W, H);
+      // a woven strip pattern, different for every name
+      const cols = ["#ff4458", "#4f8bff", "#2fe38c", "#ffd23f", "#f8f0d8"];
+      for (const y0 of [60, H - 180]) for (let xx = 0; xx < W; xx += 40) for (let yy = 0; yy < 120; yy += 40) {
+        x.fillStyle = cols[Math.floor(rand() * cols.length)];
+        if (rand() > 0.35) x.fillRect(xx, y0 + yy, 40, 40);
       }
-      x.globalAlpha = 1;
-      x.fillStyle = "#fff"; x.textAlign = "center";
-      x.font = "600 36px Inter, sans-serif"; x.globalAlpha = .85;
-      x.fillText("THE MEANING OF", W / 2, 210); x.globalAlpha = 1;
-      let size = 190;
-      x.font = `800 ${size}px 'Baloo 2', sans-serif`;
-      while (x.measureText(display).width > W - 120 && size > 80) { size -= 10; x.font = `800 ${size}px 'Baloo 2', sans-serif`; }
-      x.fillText(display, W / 2, 400);
-      x.font = "600 34px Inter, sans-serif"; x.globalAlpha = .9;
-      x.fillText(n[2], W / 2, 480); x.globalAlpha = 1;
-      x.fillRect(W / 2 - 60, 530, 120, 6);
-      x.font = "600 50px Inter, sans-serif";
-      let y = wrap(x, n[3], W / 2, 640, W - 160, 66);
-      x.font = "500 30px Inter, sans-serif"; x.globalAlpha = .8;
+      x.textAlign = "center"; x.fillStyle = "#f8f0d8";
+      x.font = "26px 'Press Start 2P'"; x.fillText("The meaning of", W / 2, 290);
+      let size = 110;
+      x.font = `${size}px 'Press Start 2P'`;
+      while (x.measureText(display).width > W - 100 && size > 40) { size -= 6; x.font = `${size}px 'Press Start 2P'`; }
+      x.fillStyle = "#05021a"; x.fillText(display, W / 2 + 8, 448);
+      x.fillStyle = accent; x.fillText(display, W / 2, 440);
+      x.fillStyle = "#f8f0d8"; x.font = "44px 'VT323'"; x.globalAlpha = .85;
+      x.fillText(n[2], W / 2, 520); x.globalAlpha = 1;
+      x.font = "60px 'VT323'";
+      const y = wrap(x, n[3], W / 2, 630, W - 140, 60);
       const variants = [n[0], ...n[1].split(",").map(v => v.trim())].filter(v => norm(v) !== norm(display));
-      wrap(x, "Also spelled: " + variants.join(", "), W / 2, y + 90, W - 200, 42);
-      x.fillText("PK Arcade · Gambian Name Meanings", W / 2, H - 60);
+      x.font = "40px 'VT323'"; x.globalAlpha = .8;
+      wrap(x, "Also spelled " + variants.join(", "), W / 2, y + 90, W - 180, 42);
       x.globalAlpha = 1;
     }
 
@@ -138,7 +125,9 @@
       return y;
     }
 
-    document.fonts.ready.then(() => { if (location.hash) lookup(decodeURIComponent(location.hash.slice(1))); });
+    Promise.all([document.fonts.load("20px 'Press Start 2P'"), document.fonts.load("20px 'VT323'")]).then(() => {
+      if (location.hash) lookup(decodeURIComponent(location.hash.slice(1)));
+    });
   </script>
 </body>
 </html>

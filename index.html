@@ -3,112 +3,102 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PK Arcade - games and toys from the Gambia</title>
-  <meta name="description" content="Wolof Wordle, guess the Gambian town, brew ataya, build a bridge and more - free games made in the Gambia.">
+  <title>PK Arcade - games from the Gambia</title>
+  <meta name="description" content="Wolof Wordle, guess the Gambian town, brew ataya, build a bridge and more. Free games made in the Gambia.">
   <meta property="og:title" content="PK Arcade">
   <meta property="og:description" content="Wolof Wordle, guess the Gambian town, brew ataya, build a bridge and more.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+  <meta property="og:image" content="https://pk-arcade.pages.dev/assets/icons/icon-512.png">
+  <meta name="theme-color" content="#130b33">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <script src="assets/theme.js"></script>
   <link rel="stylesheet" href="assets/style.css">
   <style>
-    .hero { text-align: center; padding: 40px 10px 20px; }
-    .hero h1 {
-      font-family: var(--display); font-size: clamp(2.6rem, 9vw, 4.6rem); margin: 0; line-height: .95;
-      letter-spacing: -1px;
+    .topbar h1 { visibility: hidden; }            /* the marquee below is the real title */
+    .marquee { text-align: center; padding: 18px 0 30px; }
+    .logo {
+      font: clamp(1.6rem, 8.4vw, 4.6rem)/1.15 var(--display); margin: 0; color: var(--yellow);
+      text-shadow: var(--px) var(--px) 0 var(--red), calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--blue);
     }
-    .hero h1 span:nth-child(1) { color: var(--red); }
-    .hero h1 span:nth-child(2) { color: var(--blue); }
-    .hero p { font-size: 1.1rem; color: var(--muted); max-width: 520px; margin: 14px auto 0; }
+    .logo span { display: inline-block; animation: drop .5s steps(5) both; }
+    .logo span:nth-child(2) { animation-delay: .08s; } .logo span:nth-child(3) { animation-delay: .24s; }
+    .logo span:nth-child(4) { animation-delay: .32s; } .logo span:nth-child(5) { animation-delay: .4s; }
+    .logo span:nth-child(6) { animation-delay: .48s; } .logo span:nth-child(7) { animation-delay: .56s; }
+    .logo span:nth-child(8) { animation-delay: .64s; }
+    @keyframes drop { from { transform: translateY(-40px); opacity: 0; } }
+    .tagline { margin: 22px auto 0; max-width: 30ch; font-size: 1.6rem; }
+    .pick { font: .7rem var(--display); margin-top: 26px; color: var(--green); }
 
-    .grid {
-      display: grid; gap: 16px; margin-top: 26px;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    }
+    .games { display: grid; gap: 18px; grid-template-columns: 1fr; }
+    @media (min-width: 720px) { .games { grid-template-columns: 1fr 1fr; } }
     .tile {
-      position: relative; display: flex; flex-direction: column; gap: 6px;
-      text-decoration: none; color: var(--ink);
-      background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
-      padding: 20px 20px 18px; overflow: hidden;
-      transition: transform .15s ease, box-shadow .15s ease;
+      display: grid; grid-template-columns: 92px 1fr; text-decoration: none; color: var(--ink);
+      background: var(--panel); border: var(--px) solid var(--line);
+      box-shadow: calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--shadow);
     }
-    .tile:hover { transform: translateY(-4px) rotate(-.4deg); box-shadow: 0 2px 0 rgba(0,0,0,.08), 0 18px 40px -14px rgba(60,40,10,.45); }
-    .tile .emoji { font-size: 2.6rem; line-height: 1; }
-    .tile h2 { margin: 6px 0 0; font-size: 1.45rem; line-height: 1.1; }
-    .tile p { margin: 0; color: var(--muted); font-size: .95rem; }
-    .tile .tag {
-      position: absolute; top: 16px; right: 16px; font: 700 .72rem var(--body); letter-spacing: .04em;
-      text-transform: uppercase; padding: 4px 9px; border-radius: 999px; color: #fff;
-    }
-    .tile::after {
-      content: ""; position: absolute; inset: auto -40px -60px auto; width: 140px; height: 140px;
-      border-radius: 50%; opacity: .09; background: currentColor;
-    }
-    .c-red { color: var(--red); } .c-blue { color: var(--blue); } .c-green { color: var(--green); }
-    .c-red .tag { background: var(--red); } .c-blue .tag { background: var(--blue); } .c-green .tag { background: var(--green); }
-    .tile.c-red h2, .tile.c-blue h2, .tile.c-green h2 { color: var(--ink); }
+    .tile:hover, .tile:focus-visible { transform: translate(calc(var(--px) * -1), calc(var(--px) * -1)); box-shadow: calc(var(--px) * 3) calc(var(--px) * 3) 0 var(--shadow); }
+    .tile:active { transform: translate(calc(var(--px) * 2), calc(var(--px) * 2)); box-shadow: none; }
+    .tile .art { display: grid; place-items: center; background: var(--bg); border-right: var(--px) solid var(--line); }
+    .tile .txt { padding: 14px 14px 12px; }
+    .tile h2 { font-size: .78rem; margin-bottom: 8px; }
+    .tile p { margin: 0; color: var(--muted); font-size: 1.3rem; line-height: 1.1; }
+    .tile:hover h2 { color: var(--yellow); }
+    :root[data-theme="day"] .tile:hover h2 { color: var(--red); }
+
+    .install { display: none; margin: 30px auto 0; text-align: center; }
+    .install.show { display: block; }
   </style>
 </head>
-<body>
-  <div class="flag"></div>
+<body data-title="PK Arcade" data-home>
   <main>
-    <section class="hero">
-      <h1><span>PK</span> <span>Arcade</span></h1>
-      <p>Free games and toys made in the Gambia 🇬🇲. Play on your phone and share your scores on WhatsApp.</p>
+    <section class="marquee">
+      <p class="logo" aria-label="PK Arcade"><span>P</span><span>K</span> <span>A</span><span>R</span><span>C</span><span>A</span><span>D</span><span>E</span></p>
+      <p class="tagline">Eight free games made in the Gambia. Play on your phone, share your score on WhatsApp.</p>
+      <p class="pick blink">Pick a game</p>
     </section>
 
-    <section class="grid">
-      <a class="tile c-green" href="wordle/">
-        <span class="tag">Daily</span>
-        <span class="emoji">🟩</span>
-        <h2>Wolof Wordle</h2>
-        <p>Guess today's 5-letter Wolof word in six tries.</p>
-      </a>
-      <a class="tile c-blue" href="guess-the-place/">
-        <span class="tag">Map</span>
-        <span class="emoji">🛰️</span>
-        <h2>Guess the Place</h2>
-        <p>Which Gambian town is this from space? Bakau or Brikama?</p>
-      </a>
-      <a class="tile c-red" href="ataya/">
-        <span class="tag">Game</span>
-        <span class="emoji">🍵</span>
-        <h2>Ataya Master</h2>
-        <p>Pour from high, build the foam, don't spill. Are you the real ataya boy?</p>
-      </a>
-      <a class="tile c-green" href="dish-quiz/">
-        <span class="tag">Quiz</span>
-        <span class="emoji">🍲</span>
-        <h2>Which Gambian Dish Are You?</h2>
-        <p>Domoda, benachin or superkanja? Eight questions to find out.</p>
-      </a>
-      <a class="tile c-blue" href="names/">
-        <span class="tag">Lookup</span>
-        <span class="emoji">🔤</span>
-        <h2>Name Meanings</h2>
-        <p>What does Lamin, Isatou or Ebrima mean? Make a card for your name.</p>
-      </a>
-      <a class="tile c-red" href="soundboard/">
-        <span class="tag">Toy</span>
-        <span class="emoji">📢</span>
-        <h2>Gambia Sound Board</h2>
-        <p>Gele-gele horns, ferry blasts, apprentices calling "Brikama! Brikama!"</p>
-      </a>
-      <a class="tile c-blue" href="sky/">
-        <span class="tag">Live</span>
-        <span class="emoji">🌌</span>
-        <h2>Sky Over Banjul</h2>
-        <p>The stars, planets and moon above the Gambia right now.</p>
-      </a>
-      <a class="tile c-green" href="bridge/">
-        <span class="tag">Physics</span>
-        <span class="emoji">🌉</span>
-        <h2>Bridge Builder</h2>
-        <p>Build a truss, send the car across, and see if it holds.</p>
-      </a>
-    </section>
+    <nav class="games" id="games" aria-label="Games"></nav>
+
+    <div class="install" id="install">
+      <button class="btn green" id="installBtn">Install on this phone</button>
+      <p class="muted" style="margin-top:12px">Adds PK Arcade to your home screen. Most games then work with no data.</p>
+    </div>
   </main>
   <footer class="site">
-    Made by <a href="https://github.com/pk-left">Dodou "PK" Njie</a> · Mechanical Engineering student, the Gambia ·
+    Made by <a href="https://github.com/pk-left">Dodou "PK" Njie</a>, mechanical engineering student.
     <a href="https://github.com/pk-left/pk-arcade">Source code</a>
   </footer>
+
+  <script src="assets/common.js"></script>
+  <script src="assets/icons.js"></script>
+  <script>
+    const GAMES = [
+      ["wordle", "wordle/", "Wolof Wordle", "Guess today's 5-letter Wolof word in six tries."],
+      ["place", "guess-the-place/", "Guess the Place", "Which Gambian town is this from space?"],
+      ["ataya", "ataya/", "Ataya Master", "Pour from high, build the foam, don't spill."],
+      ["bridge", "bridge/", "Bridge Builder", "Build a truss and drive a car across it."],
+      ["dish", "dish-quiz/", "Which Dish Are You?", "Domoda, benachin or superkanja? Eight questions."],
+      ["names", "names/", "Name Meanings", "What does Lamin, Isatou or Kumba mean?"],
+      ["sound", "soundboard/", "Sound Board", "Gele-gele horns, the ferry, sabar drums."],
+      ["sky", "sky/", "Sky Over Banjul", "The stars, planets and moon above you right now."],
+    ];
+    document.getElementById("games").innerHTML = GAMES.map(([icon, href, name, line]) =>
+      `<a class="tile" href="${href}"><span class="art">${pixelIcon(GAME_ICONS[icon], 60)}</span>
+       <span class="txt"><h2>${name}</h2><p>${line}</p></span></a>`).join("");
+
+    // "Install" button, shown only when the browser says the site can be installed
+    let installEvent = null;
+    addEventListener("beforeinstallprompt", e => {
+      e.preventDefault(); installEvent = e;
+      document.getElementById("install").classList.add("show");
+    });
+    document.getElementById("installBtn").onclick = async () => {
+      if (!installEvent) return;
+      installEvent.prompt();
+      await installEvent.userChoice;
+      document.getElementById("install").classList.remove("show");
+    };
+  </script>
 </body>
 </html>

@@ -3,58 +3,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sky Over Banjul · PK Arcade</title>
+  <title>Sky Over Banjul - PK Arcade</title>
   <meta name="description" content="The stars, planets and moon above the Gambia right now.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌌</text></svg>">
+  <meta name="theme-color" content="#130b33">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml">
+  <script src="../assets/theme.js"></script>
   <link rel="stylesheet" href="../assets/style.css">
   <style>
-    body { background: #070b1f; color: #e8ecff; }
-    .topbar h1 { color: #fff; }
-    .muted { color: #9aa3c7; }
-    .wrap { display: grid; gap: 16px; }
+    .wrap { display: grid; gap: 18px; }
     @media (min-width: 900px) { .wrap { grid-template-columns: 1fr 300px; align-items: start; } }
+    .side { display: grid; gap: 18px; }
+    .scope { background: #05021a; border: var(--px) solid var(--line); box-shadow: calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--shadow); padding: 6px; }
     #sky { width: 100%; aspect-ratio: 1; display: block; touch-action: manipulation; cursor: crosshair; }
-    .panel { background: #111833; border-radius: var(--radius); padding: 16px; }
-    .panel h3 { margin: 0 0 8px; color: #fff; }
-    .pl { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #222b52; font-size: .95rem; }
+    .when { font: .62rem/1.6 var(--display); margin: 0 0 12px; }
+    .tonight { margin: 0 0 14px; }
+    .controls { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 14px 0; }
+    .controls label { display: flex; align-items: center; gap: 8px; }
+    .controls .btn, .time .btn { font-size: .6rem; padding: 10px 12px; }
+    .info { min-height: 1.4em; color: var(--yellow); text-align: center; margin: 12px 0 8px; }
+    :root[data-theme="day"] .info { color: var(--red); }
+    .time { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+    .panel h3 { margin-bottom: 12px; }
+    .pl { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 2px dotted var(--muted); }
     .pl:last-child { border-bottom: 0; }
-    .pl b { font-weight: 600; }
-    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-    .controls label { display: flex; align-items: center; gap: 6px; font-size: .9rem; }
-    input[type=range] { width: 100%; accent-color: #f5c542; }
     .moon { display: flex; gap: 14px; align-items: center; }
-    #moonCv { width: 72px; height: 72px; }
-    .info { min-height: 1.4em; font-weight: 600; color: #f5c542; text-align: center; margin-top: 6px; }
-    .btn.ghost { color: #e8ecff; box-shadow: inset 0 0 0 2px #e8ecff; }
-    footer.site { color: #6c76a3; }
+    #moonCv { width: 72px; height: 72px; flex: none; }
   </style>
 </head>
-<body>
-  <div class="flag"></div>
-  <header class="topbar">
-    <a class="back" href="../">← Arcade</a>
-    <h1>Sky Over Banjul 🌌</h1>
-  </header>
+<body data-title="Sky Over Banjul">
   <main>
-    <div class="controls">
-      <span id="when" style="font-weight:700"></span>
-      <span style="flex:1"></span>
-      <label><input type="checkbox" id="lines" checked> Constellations</label>
-      <label><input type="checkbox" id="names" checked> Names</label>
-      <button class="btn ghost" id="locBtn">📍 Use my location</button>
-    </div>
+    <p class="when" id="when"></p>
+    <p class="tonight" id="tonight"></p>
     <div class="wrap">
       <div>
-        <canvas id="sky"></canvas>
-        <div class="info" id="info">Tap a bright star or planet to see its name</div>
-        <input type="range" id="slider" min="-720" max="720" step="5" value="0" aria-label="Time offset">
-        <div class="row" style="justify-content:space-between">
-          <span class="muted" style="font-size:.85rem">−12 h</span>
-          <button class="btn ghost" id="nowBtn" style="padding:6px 16px">Now</button>
-          <span class="muted" style="font-size:.85rem">+12 h</span>
+        <div class="scope"><canvas id="sky"></canvas></div>
+        <p class="info" id="info">Tap a bright star or planet to see its name.</p>
+        <input type="range" id="slider" min="-720" max="720" step="5" value="0" aria-label="Move the time earlier or later">
+        <div class="time">
+          <span class="muted">12 h earlier</span>
+          <button class="btn" id="nowBtn">Now</button>
+          <span class="muted">12 h later</span>
+        </div>
+        <div class="controls">
+          <label><input type="checkbox" id="lines" checked> Constellation lines</label>
+          <label><input type="checkbox" id="names" checked> Names</label>
+          <button class="btn ghost" id="locBtn">Use my location</button>
         </div>
       </div>
-      <div class="wrap" style="grid-template-columns:1fr">
+      <div class="side">
         <div class="panel">
           <h3>Moon</h3>
           <div class="moon"><canvas id="moonCv" width="144" height="144"></canvas><div id="moonTxt"></div></div>
@@ -71,10 +68,11 @@
     </div>
   </main>
   <footer class="site">
-    Positions calculated with <a href="https://github.com/cosinekitty/astronomy">Astronomy Engine</a> (MIT) ·
-    star data from <a href="https://github.com/ofrohn/d3-celestial">d3-celestial</a> (BSD) / Hipparcos.
+    Positions from <a href="https://github.com/cosinekitty/astronomy">Astronomy Engine</a>.
+    Star data from <a href="https://github.com/ofrohn/d3-celestial">d3-celestial</a> and the Hipparcos catalogue.
   </footer>
 
+  <script src="../assets/common.js"></script>
   <script src="astronomy.min.js"></script>
   <script src="skydata.js"></script>
   <script>
@@ -177,13 +175,13 @@
     // constellation names
     if (document.getElementById("names").checked) {
       ctx.fillStyle = `rgba(170,190,255,${0.55 * starAlpha})`;
-      ctx.font = `600 ${Math.max(9, S / 70)}px Inter, sans-serif`; ctx.textAlign = "center";
+      ctx.font = `${Math.max(13, S / 42)}px VT323, monospace`; ctx.textAlign = "center";
       for (const id in SKYDATA.labels) {
         const [name, ra, dec] = SKYDATA.labels[id];
         const [alt, az] = altAz(ra, dec, lst);
         if (alt < 8) continue;
         const [x, y] = project(alt, az);
-        ctx.fillText(name.toUpperCase(), x, y);
+        ctx.fillText(name, x, y);
       }
     }
     // planets, moon and sun
@@ -198,7 +196,7 @@
       ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
       ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, 6 - mag) * (S / 700 + .4), 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = "#fff"; ctx.font = `700 ${Math.max(10, S / 55)}px Inter, sans-serif`; ctx.textAlign = "left";
+      ctx.fillStyle = "#fff"; ctx.font = `${Math.max(16, S / 30)}px VT323, monospace`; ctx.textAlign = "left";
       ctx.fillText(label, x + 8, y - 6);
       hits.push({ x, y, label: `${label} (planet, magnitude ${mag.toFixed(1)})` });
     }
@@ -214,14 +212,14 @@
       const [x, y] = project(sa, sun.azimuth);
       ctx.fillStyle = "#ffd84a"; ctx.shadowColor = "#ffd84a"; ctx.shadowBlur = 30;
       ctx.beginPath(); ctx.arc(x, y, S / 32, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
-      hits.push({ x, y, label: "The Sun - don't look at it directly!" });
+      hits.push({ x, y, label: "The Sun. Never look straight at it." });
     }
     ctx.restore();
 
     // horizon ring and compass points
     ctx.strokeStyle = "#3a477d"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2 - 18, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = "#c8d0f5"; ctx.font = "700 14px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#c8d0f5"; ctx.font = "10px 'Press Start 2P', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     [["N", 0], ["E", 90], ["S", 180], ["W", 270]].forEach(([l, az]) => {
       const [x, y] = project(-9, az); ctx.fillText(l, x, y);
     });
@@ -229,16 +227,21 @@
 
     // side panels
     document.getElementById("when").textContent =
-      `${place.name} · ${date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short", timeZone: "UTC" })} GMT`;
+      `${place.name}, ${date.toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short", timeZone: "UTC" })} GMT`;
+    const up = pinfo.filter(p => p.alt > 5).sort((a, b) => a.mag - b.mag).map(p => p.label);
+    document.getElementById("tonight").textContent = sa > -6
+      ? "The Sun is up, so the stars are washed out. Drag the slider to tonight."
+      : up.length ? `Up right now: ${up.join(", ")}${moonH.altitude > 5 ? " and the Moon" : ""}. The brightest dots that don't twinkle are planets.`
+      : `No bright planets are up right now${moonH.altitude > 5 ? ", but the Moon is" : ""}. Drag the slider to see when they rise.`;
     document.getElementById("planets").innerHTML = pinfo.map(p =>
-      `<div class="pl"><b>${p.label}</b><span class="${p.alt > 0 ? "" : "muted"}">${p.alt > 0 ? `up, ${Math.round(p.alt)}° high in the ${compass(p.az)}` : "below the horizon"}</span></div>`).join("");
+      `<div class="pl"><b>${p.label}</b><span class="${p.alt > 0 ? "" : "muted"}">${p.alt > 0 ? `${Math.round(p.alt)}° up, ${compass(p.az)}` : "not up"}</span></div>`).join("");
     const nextFull = A.SearchMoonPhase(180, date, 40), nextNew = A.SearchMoonPhase(0, date, 40);
-    document.getElementById("moonTxt").innerHTML = `<b>${phaseName(phaseAngle)}</b><br>${Math.round(frac * 100)}% lit · ${moonH.altitude > 0 ? "up now" : "not up"}<br>
+    document.getElementById("moonTxt").innerHTML = `<b>${phaseName(phaseAngle)}</b><br>${Math.round(frac * 100)}% lit, ${moonH.altitude > 0 ? "up now" : "not up"}<br>
       <span class="muted">Full moon: ${fmtDate(nextFull)}<br>New moon: ${fmtDate(nextNew)}</span>`;
     drawMoon(document.getElementById("moonCv").getContext("2d"), 72, 72, 62, phaseAngle, true);
     const rise = A.SearchRiseSet("Sun", observer, +1, date, 1), set = A.SearchRiseSet("Sun", observer, -1, date, 1);
-    document.getElementById("sunTxt").innerHTML = `${sa > 0 ? "☀️ Up" : sa > -6 ? "🌅 Twilight" : "🌙 Night"} (${sa.toFixed(0)}°)<br>
-      <span class="muted">Next sunrise ${fmtTime(rise)} · next sunset ${fmtTime(set)} (GMT)</span>`;
+    document.getElementById("sunTxt").innerHTML = `${sa > 0 ? "Up" : sa > -6 ? "Twilight" : "Night"} (${sa.toFixed(0)}°)<br>
+      <span class="muted">Next sunrise ${fmtTime(rise)}<br>Next sunset ${fmtTime(set)} (GMT)</span>`;
   }
 
   function drawMoon(c, x, y, r, phase, big) {
@@ -262,7 +265,7 @@
     const names = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous", "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
     return names[Math.round(p / 45) % 8];
   }
-  const compass = az => ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][Math.round(az / 45) % 8];
+  const compass = az => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(az / 45) % 8];
   const fmtDate = t => t ? t.date.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" }) : "-";
   const fmtTime = t => t ? t.date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "-";
   function mix(a, b, t) {
@@ -275,7 +278,7 @@
     const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
     let best = null, bd = 22;
     for (const h of hits) { const d = Math.hypot(h.x - mx, h.y - my); if (d < bd) { bd = d; best = h; } }
-    document.getElementById("info").textContent = best ? best.label : "Nothing bright there - try another dot";
+    document.getElementById("info").textContent = best ? best.label : "Nothing bright there. Try another dot.";
   });
   document.getElementById("slider").oninput = e => { offsetMin = +e.target.value; draw(); };
   document.getElementById("nowBtn").onclick = () => { offsetMin = 0; document.getElementById("slider").value = 0; draw(); };
@@ -287,9 +290,10 @@
       place = { name: "Your location", lat: pos.coords.latitude, lon: pos.coords.longitude };
       observer = new A.Observer(place.lat, place.lon, 0);
       draw();
-    }, () => alert("Couldn't get your location - showing Banjul."));
+    }, () => toast("Couldn't get your location. Still showing Banjul."));
   };
   addEventListener("resize", resize);
+  document.fonts.ready.then(resize);
   resize();
   setInterval(() => { if (offsetMin === 0) draw(); }, 30000);
   </script>

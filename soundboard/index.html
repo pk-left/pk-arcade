@@ -3,59 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gambia Sound Board · PK Arcade</title>
-  <meta name="description" content="Gele-gele horns, ferry blasts, apprentices calling Brikama! - a Gambian sound board.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📢</text></svg>">
+  <title>Gambia Sound Board - PK Arcade</title>
+  <meta name="description" content="Gele-gele horns, the ferry, sabar drums and apprentices calling Brikama! Tap to play, record your own mix.">
+  <meta name="theme-color" content="#130b33">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml">
+  <script src="../assets/theme.js"></script>
   <link rel="stylesheet" href="../assets/style.css">
   <style>
-    .pads { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .deck { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+    .deck .btn { font-size: .6rem; padding: 12px; }
+    #recState { flex: 1; min-width: 12ch; }
+    .rec-on { background: var(--red) !important; color: var(--on-accent) !important; }
+    .pads { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
     .pad {
-      position: relative; aspect-ratio: 1 / .85; border: 0; border-radius: 20px; cursor: pointer; color: #fff;
-      font: 700 1.05rem var(--display); line-height: 1.1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 6px; padding: 10px;
-      box-shadow: 0 5px 0 rgba(0,0,0,.25); transition: transform .06s, box-shadow .06s;
+      position: relative; min-height: 104px; padding: 12px 10px; cursor: pointer; text-align: left;
+      font: .62rem/1.6 var(--display); color: #130b33; border: var(--px) solid var(--line);
+      box-shadow: 0 calc(var(--px) * 2) 0 var(--shadow); display: flex; flex-direction: column; justify-content: space-between;
     }
-    .pad .e { font-size: 2.4rem; }
-    .pad:active, .pad.hit { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
-    .pad.hit { filter: brightness(1.15); }
+    .pad kbd { font: 1.2rem var(--body); opacity: .7; align-self: flex-end; }
+    .pad:active, .pad.hit { transform: translateY(calc(var(--px) * 2)); box-shadow: none; filter: brightness(1.25); }
     .bubble {
-      position: fixed; left: 50%; top: 22%; transform: translate(-50%, 0) scale(.6); opacity: 0; pointer-events: none;
-      background: #fff; color: var(--ink); font: 800 clamp(1.8rem, 7vw, 3rem) var(--display); padding: 14px 26px;
-      border-radius: 26px; box-shadow: var(--shadow); z-index: 20; transition: opacity .15s, transform .15s; max-width: 90vw; text-align: center;
+      position: fixed; left: 50%; top: 24%; transform: translateX(-50%); z-index: 600; display: none;
+      background: var(--ink); color: var(--bg); font: clamp(.8rem, 4vw, 1.2rem)/1.5 var(--display);
+      padding: 14px 18px; border: var(--px) solid var(--bg); max-width: 90vw; text-align: center;
     }
-    .bubble::after { content: ""; position: absolute; bottom: -16px; left: 40px; border: 10px solid transparent; border-top: 14px solid #fff; }
-    .bubble.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
-    .opts { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 4px 0 16px; }
-    .opts label { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+    .bubble.show { display: block; }
+    .opts { display: flex; gap: 10px; align-items: center; margin: 22px 0 0; }
   </style>
 </head>
-<body>
-  <div class="flag"></div>
-  <header class="topbar">
-    <a class="back" href="../">← Arcade</a>
-    <h1>Gambia Sound Board 📢</h1>
-  </header>
+<body data-title="Sound Board">
   <main>
-    <div class="opts">
-      <label><input type="checkbox" id="voice" checked> Voice for the apprentice calls</label>
-      <span class="muted">Tip: keys 1–9 and Q–W–E–R–T work too</span>
+    <div class="deck">
+      <button class="btn red" id="rec">Record</button>
+      <button class="btn green" id="play" disabled>Play</button>
+      <button class="btn ghost" id="loop" disabled>Loop</button>
+      <span class="muted" id="recState">Tap pads, or record a mix and play it back.</span>
     </div>
     <div class="pads" id="pads"></div>
-    <p class="muted center" style="margin-top:24px">Every sound is made live in your browser with the Web Audio API - no recordings.</p>
+    <label class="opts"><input type="checkbox" id="voice" checked> Speak the apprentice calls out loud</label>
+    <p class="muted" style="margin-top:12px">Every sound is made live in your browser. There are no recordings.</p>
   </main>
   <div class="bubble" id="bubble"></div>
 
   <script src="../assets/common.js"></script>
   <script>
-  let AC = null, master = null;
+  let master = null;
   function ac() {
-    if (!AC) {
-      AC = new (window.AudioContext || window.webkitAudioContext)();
-      master = AC.createDynamicsCompressor();
-      master.connect(AC.destination);
-    }
-    if (AC.state === "suspended") AC.resume();
-    return AC;
+    const a = sfx.context();
+    if (!master) { master = a.createDynamicsCompressor(); master.connect(a.destination); }
+    return a;
   }
 
   // ---- building blocks -------------------------------------------------------
@@ -106,12 +103,10 @@
     osc("sine", f0, t0, dur, gain, { to: f1, glide: dur * 0.6, attack: 0.002, release: dur * 0.8 });
     noise(t0, 0.05, gain * 0.4, "bandpass", 2500, 0.8);
   }
-
-  function horn(t0, f, dur, gain = 0.2) {   // car horns are two detuned buzzy tones
+  function horn(t0, f, dur, gain = 0.2) {      // car horns are two detuned buzzy tones
     osc("sawtooth", f, t0, dur, gain, { filter: ["lowpass", 2200, 1] });
     osc("square", f * 1.26, t0, dur, gain * 0.6, { filter: ["lowpass", 1800, 1] });
   }
-
   function say(text, rate = 1.15, pitch = 1) {
     bubble(text);
     if (!document.getElementById("voice").checked || !("speechSynthesis" in window)) return;
@@ -120,76 +115,110 @@
     u.rate = rate; u.pitch = pitch;
     speechSynthesis.speak(u);
   }
-
   function bubble(text) {
     const b = document.getElementById("bubble");
-    b.textContent = text;
-    b.classList.add("show");
+    b.textContent = text; b.classList.add("show");
     clearTimeout(b._t);
     b._t = setTimeout(() => b.classList.remove("show"), 1600);
   }
 
   // ---- the sounds ------------------------------------------------------------
   const SOUNDS = [
-    { name: "Gele-gele horn", e: "🚐", c: "#ce1126", play(t) { horn(t, 420, .16); horn(t + .2, 420, .16); horn(t + .4, 420, .5); } },
-    { name: "Taxi honk", e: "🚕", c: "#d9a21b", play(t) { horn(t, 360, .12, .25); horn(t + .16, 360, .3, .25); } },
-    { name: "Banjul ferry", e: "⛴️", c: "#0c1c8c", play(t) {
+    { name: "Gele-gele horn", c: "#ff4458", play(t) { horn(t, 420, .16); horn(t + .2, 420, .16); horn(t + .4, 420, .5); } },
+    { name: "Taxi honk", c: "#ffd23f", play(t) { horn(t, 360, .12, .25); horn(t + .16, 360, .3, .25); } },
+    { name: "Banjul ferry", c: "#4f8bff", play(t) {
         osc("sawtooth", 98, t, 2.6, .35, { attack: .2, release: .5, filter: ["lowpass", 700, 2], vibrato: [5, 1.5] });
         osc("sawtooth", 147, t, 2.6, .18, { attack: .25, release: .5, filter: ["lowpass", 900, 2] }); } },
-    { name: "Brikama! Brikama!", e: "🗣️", c: "#3a7728", play() { say("Brikama! Brikama! Brikama!", 1.25) } },
-    { name: "Westfield!", e: "🗣️", c: "#2a5a1d", play() { say("Westfield! Westfield! Two seats left!", 1.3) } },
-    { name: "Banjul! Banjul!", e: "🗣️", c: "#1f4415", play() { say("Banjul! Banjul! Banjul!", 1.25) } },
-    { name: "Ataya clink", e: "🍵", c: "#b5651d", play(t) {
+    { name: "Brikama! Brikama!", c: "#2fe38c", play() { say("Brikama! Brikama! Brikama!", 1.25); } },
+    { name: "Westfield!", c: "#2fe38c", play() { say("Westfield! Westfield! Two seats left!", 1.3); } },
+    { name: "Banjul! Banjul!", c: "#2fe38c", play() { say("Banjul! Banjul! Banjul!", 1.25); } },
+    { name: "Ataya clink", c: "#ffb347", play(t) {
         [2600, 3300].forEach((f, i) => osc("sine", f, t + i * .12, 1.2, .18, { attack: .002, release: 1.1 }));
         osc("sine", 5200, t, .4, .05, { attack: .001, release: .35 }); } },
-    { name: "Sabar drums", e: "🥁", c: "#7d1d14", play(t) {
+    { name: "Sabar drums", c: "#ff7a59", play(t) {
         const pat = [0, .15, .3, .38, .45, .6, .75, .83, .9, 1.05, 1.2, 1.28, 1.35, 1.5];
         pat.forEach((d, i) => i % 3 === 0 ? drum(t + d, 180, 70, .3, .9) : (noise(t + d, .08, .5, "bandpass", 900 + (i % 2) * 600, 2), drum(t + d, 330, 200, .1, .35))); } },
-    { name: "Talking drum", e: "🪘", c: "#8a4b12", play(t) {
+    { name: "Talking drum", c: "#ff7a59", play(t) {
         [[0, 220, 120], [.25, 180, 260], [.5, 200, 110], [.7, 150, 240], [.95, 260, 120]].forEach(([d, a, b]) => drum(t + d, a, b, .3, .8)); } },
-    { name: "Rooster at dawn", e: "🐓", c: "#e56b1f", play(t) {
-        const seg = [[0, .18, 600, 900], [.2, .14, 850, 1100], [.36, .5, 1150, 1250], [.88, .4, 1200, 700]];
-        seg.forEach(([d, dur, a, b]) => osc("sawtooth", a, t + d, dur, .15, { to: b, filter: ["bandpass", 1400, 3], vibrato: [28, 25] })); } },
-    { name: "Rain on the zinc", e: "🌧️", c: "#475569", play(t) {
+    { name: "Kick", c: "#f8f0d8", play(t) { drum(t, 150, 45, .3, 1); } },
+    { name: "Clap", c: "#f8f0d8", play(t) { [0, .012, .026].forEach(d => noise(t + d, .09, .5, "bandpass", 1500, 1.5)); } },
+    { name: "Rooster at dawn", c: "#ffd23f", play(t) {
+        [[0, .18, 600, 900], [.2, .14, 850, 1100], [.36, .5, 1150, 1250], [.88, .4, 1200, 700]]
+          .forEach(([d, dur, a, b]) => osc("sawtooth", a, t + d, dur, .15, { to: b, filter: ["bandpass", 1400, 3], vibrato: [28, 25] })); } },
+    { name: "Rain on the zinc", c: "#9fb4ff", play(t) {
         noise(t, 3, .12, "highpass", 3000, .5, false);
-        for (let i = 0; i < 70; i++) { const d = Math.random() * 3; osc("triangle", 2000 + Math.random() * 3000, t + d, .05, .06 + Math.random() * .08, { attack: .001, release: .04 }); } } },
-    { name: "NAWEC cut - generator!", e: "⚡", c: "#1d1a16", play(t) {
-        bubble("Lights off! 😩");
+        for (let i = 0; i < 70; i++) osc("triangle", 2000 + Math.random() * 3000, t + Math.random() * 3, .05, .06 + Math.random() * .08, { attack: .001, release: .04 }); } },
+    { name: "Light off, generator on", c: "#b3a6e0", play(t) {
+        bubble("NAWEC took the light");
         for (let i = 0; i < 4; i++) noise(t + i * .18, .12, .4, "lowpass", 400, 2);
         osc("sawtooth", 40, t + .8, 2.4, .35, { to: 55, glide: .8, attack: .3, filter: ["lowpass", 300, 4], vibrato: [22, 4] });
         noise(t + .8, 2.4, .15, "lowpass", 600, 1, false); } },
-    { name: "Mosquito at night", e: "🦟", c: "#5b4636", play(t) {
+    { name: "Mosquito at night", c: "#b3a6e0", play(t) {
         osc("sawtooth", 620, t, 2.5, .07, { attack: .6, release: .6, vibrato: [9, 40], filter: ["bandpass", 1200, 4] });
-        setTimeout(() => bubble("👋 *slap*"), 2400);
+        setTimeout(() => bubble("Slap!"), 2400);
         noise(t + 2.45, .12, .9, "lowpass", 1200, 1); } },
-    { name: "Phone ringing", e: "📱", c: "#0c1c8c", play(t) {
-        for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) osc("square", i % 2 ? 1320 : 1760, t + r * 1 + i * .06, .06, .08, { attack: .002, release: .01 }); } },
-    { name: "Wedding cheer", e: "🎉", c: "#c2185b", play(t) {
+    { name: "Phone ringing", c: "#4f8bff", play(t) {
+        for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) osc("square", i % 2 ? 1320 : 1760, t + r + i * .06, .06, .08, { attack: .002, release: .01 }); } },
+    { name: "Wedding cheer", c: "#ff8ad1", play(t) {
         for (let i = 0; i < 8; i++) osc("sine", 1400 + Math.random() * 400, t + i * .09, .1, .12, { vibrato: [30, 140] });
         say("Waaw! Congratulations!", 1.1, 1.3); } },
   ];
 
+  const KEYS = "1234567890qwertyu";
   const pads = document.getElementById("pads");
-  const keys = "123456789qwerty";
   SOUNDS.forEach((s, i) => {
     const b = document.createElement("button");
-    b.className = "pad";
-    b.style.background = s.c;
-    b.innerHTML = `<span class="e">${s.e}</span><span>${s.name}</span>`;
-    b.onclick = () => trigger(i);
+    b.className = "pad"; b.style.background = s.c;
+    b.innerHTML = `<span>${s.name}</span><kbd>${KEYS[i].toUpperCase()}</kbd>`;
+    b.onpointerdown = () => trigger(i);
     pads.appendChild(b);
   });
-  function trigger(i) {
+
+  // ---- recorder: remembers which pad was hit and when ---------------------------
+  let recording = false, recStart = 0, take = [], timers = [], looping = false;
+  const $ = id => document.getElementById(id);
+
+  function trigger(i, fromPlayback = false) {
+    if (sfx.muted) return toast("Sound is off. Tap the speaker button at the top.");
     const a = ac();
     SOUNDS[i].play(a.currentTime + 0.02);
     const b = pads.children[i];
     b.classList.add("hit");
-    setTimeout(() => b.classList.remove("hit"), 150);
+    setTimeout(() => b.classList.remove("hit"), 140);
+    if (recording && !fromPlayback) {
+      take.push([i, performance.now() - recStart]);
+      $("recState").textContent = `Recording: ${take.length} hit${take.length === 1 ? "" : "s"}`;
+    }
   }
   addEventListener("keydown", e => {
-    const i = keys.indexOf(e.key.toLowerCase());
-    if (i >= 0 && i < SOUNDS.length && !e.repeat) trigger(i);
+    if (e.repeat || e.ctrlKey || e.metaKey) return;
+    const i = KEYS.indexOf(e.key.toLowerCase());
+    if (i >= 0 && i < SOUNDS.length) trigger(i);
   });
+
+  $("rec").onclick = () => {
+    stopPlayback();
+    recording = !recording;
+    $("rec").textContent = recording ? "Stop" : "Record";
+    $("rec").classList.toggle("rec-on", recording);
+    if (recording) { take = []; recStart = performance.now(); $("recState").textContent = "Recording: tap some pads"; }
+    else {
+      const has = take.length > 0;
+      $("play").disabled = $("loop").disabled = !has;
+      $("recState").textContent = has ? `Saved a mix of ${take.length} hits.` : "Nothing recorded. Tap pads while recording.";
+    }
+  };
+  function playTake() {
+    if (!take.length) return;
+    const first = take[0][1];                         // skip the silence before the first hit
+    take.forEach(([i, at]) => timers.push(setTimeout(() => trigger(i, true), at - first)));
+    const end = take[take.length - 1][1] - first + 900;
+    timers.push(setTimeout(() => { timers = []; looping ? playTake() : ($("play").textContent = "Play"); }, end));
+    $("play").textContent = "Stop";
+  }
+  function stopPlayback() { timers.forEach(clearTimeout); timers = []; $("play").textContent = "Play"; }
+  $("play").onclick = () => timers.length ? stopPlayback() : playTake();
+  $("loop").onclick = () => { looping = !looping; $("loop").classList.toggle("on", looping); $("loop").classList.toggle("ghost", !looping); };
   </script>
 </body>
 </html>

@@ -3,69 +3,89 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Guess the Place · PK Arcade</title>
+  <title>Guess the Place - PK Arcade</title>
   <meta name="description" content="Which Gambian town is this from space?">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛰️</text></svg>">
+  <meta name="theme-color" content="#130b33">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../assets/icons/icon.svg" type="image/svg+xml">
+  <script src="../assets/theme.js"></script>
   <link rel="stylesheet" href="../assets/style.css">
   <link rel="stylesheet" href="../assets/leaflet/leaflet.css">
   <style>
-    .status { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: 600; }
-    .dots { display: flex; gap: 6px; }
-    .dots i { width: 12px; height: 12px; border-radius: 50%; background: #d8ccb5; display: block; }
-    .dots i.cur { background: var(--blue); }
+    main { max-width: 760px; }
+    .hud { display: flex; gap: 10px; align-items: stretch; margin-bottom: 12px; }
+    .hud .chip { flex: 1; }
+    .dots { display: flex; gap: 6px; margin-top: 2px; }
+    .dots i { width: 14px; height: 14px; background: var(--bg); border: 2px solid var(--line); display: block; }
+    .dots i.cur { background: var(--yellow); }
     .dots i.good { background: var(--green); }
     .dots i.bad { background: var(--red); }
-    #sat { height: min(62vh, 480px); border-radius: var(--radius); box-shadow: var(--shadow); background: #2a3a2a; }
-    .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-    .opt {
-      font: 700 1.05rem var(--display); padding: 14px 10px; border-radius: 14px; border: 0; cursor: pointer;
-      background: var(--card); box-shadow: var(--shadow); color: var(--ink);
-    }
-    .opt.right { background: var(--green); color: #fff; }
-    .opt.wrong { background: var(--red); color: #fff; }
+    .frame { border: var(--px) solid var(--line); box-shadow: calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--shadow); background: #1d2b1d; }
+    #sat { height: min(56vh, 440px); }
+    .ask { font: .78rem/1.5 var(--display); margin: 0 0 12px; min-height: 1.5em; }
+    .under { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .opt { font: 1.5rem var(--body); padding: 12px 8px; cursor: pointer; color: var(--ink); background: var(--panel);
+           border: var(--px) solid var(--line); box-shadow: var(--px) var(--px) 0 var(--shadow); }
+    .opt:active { transform: translate(var(--px), var(--px)); box-shadow: none; }
+    .opt.right { background: var(--green); color: var(--on-accent); }
+    .opt.wrong { background: var(--red); color: var(--on-accent); }
     .opt:disabled { cursor: default; }
-    .hintrow { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 10px; flex-wrap: wrap; }
-    .reveal { display: none; margin-top: 14px; }
+    .reveal { display: none; margin-top: 16px; }
     .reveal.show { display: block; }
-    .reveal .card { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    #mini { height: 220px; border-radius: 12px; }
-    @media (min-width: 720px) { .reveal .card { grid-template-columns: 1.1fr 1fr; align-items: center; } }
-    .final { text-align: center; padding: 30px 10px; }
-    .final .big { font: 800 4rem var(--display); line-height: 1; }
-    .leaflet-control-attribution { font-size: 9px; }
+    .reveal h3 { margin-bottom: 10px; line-height: 1.5; }
+    #mini { height: 200px; border: var(--px) solid var(--line); margin-bottom: 12px; }
+    .final { text-align: center; }
+    .final .big { font: 2.4rem var(--display); color: var(--yellow); margin: 10px 0 14px; }
+    .squares { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
+    .squares i { width: 22px; height: 22px; border: 2px solid var(--line); }
+    .leaflet-container { font: 1rem var(--body); background: #1d2b1d; }
+    .leaflet-control-attribution { font-size: 11px; }
+    .offline { display: none; }
+    .offline.show { display: block; margin-bottom: 14px; }
   </style>
 </head>
-<body>
-  <div class="flag"></div>
-  <header class="topbar">
-    <a class="back" href="../">← Arcade</a>
-    <h1>Guess the Place 🛰️</h1>
-  </header>
+<body data-title="Guess the Place">
   <main>
-    <div id="game">
-      <div class="status">
-        <span id="roundLabel">Round 1 of 5</span>
-        <span class="dots" id="dots"></span>
-        <span>Score: <b id="score">0</b></span>
+    <section id="menu" class="panel center">
+      <h2 style="margin-bottom:14px">Pick a mode</h2>
+      <p>Five rounds each. Up to 3 points a round.</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn" id="nameMode">Name it</button>
+        <button class="btn blue" id="pinMode">Pin it</button>
       </div>
-      <div id="sat"></div>
-      <div class="hintrow">
-        <span class="muted" id="worth">Worth 3 points</span>
-        <button class="btn ghost" id="zoomBtn">🔍 Zoom out (−1 point)</button>
+      <p class="muted" style="margin:18px 0 0"><b>Name it:</b> see a place from space, choose its name.<br>
+      <b>Pin it:</b> get a name, tap where it is on the map.</p>
+      <p class="muted" id="bests" style="margin:14px 0 0"></p>
+    </section>
+
+    <section id="game" style="display:none">
+      <p class="panel offline" id="offline">No connection. The satellite pictures need data, so this game can't load right now.</p>
+      <div class="hud">
+        <div class="chip"><small>Round</small><span id="roundLabel"></span><div class="dots" id="dots"></div></div>
+        <div class="chip"><small>Score</small><span id="score">0</span></div>
+        <div class="chip"><small>This round</small><span id="worth"></span></div>
+      </div>
+      <p class="ask" id="ask"></p>
+      <div class="frame"><div id="sat"></div></div>
+      <div class="under" id="nameUnder">
+        <span class="muted">Stuck? Zooming out costs 1 point.</span>
+        <button class="btn ghost" id="zoomBtn">Zoom out</button>
+      </div>
+      <div class="under" id="pinUnder" style="display:none">
+        <span class="muted">Tap the map to drop your pin. Pinch or scroll to zoom.</span>
+        <button class="btn" id="lockBtn" disabled>Lock it in</button>
       </div>
       <div class="opts" id="opts"></div>
-      <div class="reveal" id="reveal">
-        <div class="card">
-          <div>
-            <h3 id="revealTitle" style="margin:0 0 4px"></h3>
-            <p id="revealFact" style="margin:0 0 14px"></p>
-            <button class="btn" id="nextBtn">Next →</button>
-          </div>
-          <div id="mini"></div>
-        </div>
+      <div class="reveal panel" id="reveal">
+        <h3 id="revealTitle"></h3>
+        <div id="mini"></div>
+        <p id="revealFact"></p>
+        <button class="btn" id="nextBtn">Next round</button>
       </div>
-    </div>
-    <div class="final card" id="final" style="display:none"></div>
+    </section>
+
+    <section class="final panel" id="final" style="display:none"></section>
   </main>
 
   <script src="../assets/common.js"></script>
@@ -73,139 +93,184 @@
   <script src="places.js"></script>
   <script>
     const ROUNDS = 5;
-    const ZOOMS = [16, 14, 12];  // start close; each hint zooms out
+    const ZOOMS = [16, 14, 12];                      // Name it: start close, each hint zooms out
+    const GAMBIA = [[13.0, -16.9], [13.9, -13.75]];
     const SAT_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-    const SAT_ATTR = "Imagery © Esri, Maxar, Earthstar Geographics";
+    const SAT_ATTR = "Imagery &copy; Esri, Maxar, Earthstar Geographics";
+    const $ = id => document.getElementById(id);
 
-    const sat = L.map("sat", {
-      zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false,
-      doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false,
-    });
-    L.tileLayer(SAT_URL, { attribution: SAT_ATTR, maxZoom: 18 }).addTo(sat);
+    let sat = null, mini = null, layers = [];
+    let mode, rounds, round, score, hints, answered, guessMarker = null;
 
-    let mini = null, miniMarker = null;
-    let rounds, round, score, hints, answered;
+    function showBests() {
+      $("bests").textContent = `Your best: Name it ${store.get("place-best", 0)}/15, Pin it ${store.get("place-best-pin", 0)}/15`;
+    }
 
-    function newGame() {
-      rounds = shuffle(PLACES).slice(0, ROUNDS).map(p => p.slice());  // copies, so results don't leak between games
+    function ensureMaps() {
+      if (sat) return;
+      sat = L.map("sat", { zoomControl: false, attributionControl: true });
+      L.tileLayer(SAT_URL, { attribution: SAT_ATTR, maxZoom: 18 }).addTo(sat);
+      sat.on("click", e => { if (mode === "pin" && !answered) dropPin(e.latlng); });
+    }
+    function setInteractive(on) {
+      for (const h of ["dragging", "scrollWheelZoom", "doubleClickZoom", "touchZoom", "boxZoom", "keyboard"]) sat[h][on ? "enable" : "disable"]();
+    }
+
+    function newGame(m) {
+      mode = m;
+      $("menu").style.display = "none"; $("final").style.display = "none"; $("game").style.display = "";
+      $("offline").classList.toggle("show", !navigator.onLine);
+      ensureMaps();
+      rounds = shuffle(PLACES).slice(0, ROUNDS).map(p => p.slice());   // copies, so results don't leak between games
       round = 0; score = 0;
-      document.getElementById("final").style.display = "none";
-      document.getElementById("game").style.display = "";
+      $("nameUnder").style.display = mode === "name" ? "" : "none";
+      $("pinUnder").style.display = mode === "pin" ? "" : "none";
+      $("opts").style.display = mode === "name" ? "" : "none";
       startRound();
     }
 
     function startRound() {
       hints = 0; answered = false;
+      layers.forEach(l => l.remove()); layers = []; guessMarker = null;
       const [name, lat, lon] = rounds[round];
-      sat.setView([lat, lon], ZOOMS[0], { animate: false });
-      document.getElementById("roundLabel").textContent = `Round ${round + 1} of ${ROUNDS}`;
-      document.getElementById("score").textContent = score;
-      document.getElementById("reveal").classList.remove("show");
-      updateWorth();
-
-      // 3 wrong options, preferring places that are not right next door (keeps it fair)
-      const others = shuffle(PLACES.filter(p => p[0] !== name));
-      const far = others.filter(p => dist(p, rounds[round]) > 6);
-      const wrong = (far.length >= 3 ? far : others).slice(0, 3);
-      const opts = shuffle([rounds[round], ...wrong]);
-      const box = document.getElementById("opts");
-      box.innerHTML = "";
-      opts.forEach(p => {
-        const b = document.createElement("button");
-        b.className = "opt";
-        b.textContent = p[0];
-        b.onclick = () => answer(b, p[0] === name);
-        box.appendChild(b);
-      });
-      drawDots();
+      $("roundLabel").textContent = `${round + 1} of ${ROUNDS}`;
+      $("score").textContent = score;
+      $("reveal").classList.remove("show");
+      sat.invalidateSize();
+      if (mode === "name") {
+        $("ask").textContent = "Which place is this?";
+        setInteractive(false);
+        sat.setView([lat, lon], ZOOMS[0], { animate: false });
+        // Three wrong answers, preferring places that are not right next door (keeps it fair)
+        const others = shuffle(PLACES.filter(p => p[0] !== name));
+        const far = others.filter(p => km(p, rounds[round]) > 6);
+        const box = $("opts");
+        box.innerHTML = "";
+        shuffle([rounds[round], ...(far.length >= 3 ? far : others).slice(0, 3)]).forEach(p => {
+          const b = document.createElement("button");
+          b.className = "opt"; b.textContent = p[0];
+          b.onclick = () => answerName(b, p[0] === name);
+          box.appendChild(b);
+        });
+      } else {
+        $("ask").textContent = `Where is ${name}?`;
+        setInteractive(true);
+        sat.fitBounds(GAMBIA, { animate: false });
+        $("lockBtn").disabled = true;
+      }
+      updateWorth(); drawDots();
     }
 
-    function dist(a, b) {  // km, good enough at this latitude
+    function km(a, b) {       // flat-earth distance; fine across a country this small
       const dy = (a[1] - b[1]) * 111, dx = (a[2] - b[2]) * 111 * Math.cos(13.4 * Math.PI / 180);
       return Math.hypot(dx, dy);
     }
 
     function updateWorth() {
-      document.getElementById("worth").textContent = `Worth ${3 - hints} point${3 - hints === 1 ? "" : "s"}`;
-      document.getElementById("zoomBtn").disabled = hints >= ZOOMS.length - 1 || answered;
+      $("worth").textContent = mode === "name" ? `${3 - hints} pts` : "up to 3";
+      $("zoomBtn").disabled = hints >= ZOOMS.length - 1 || answered;
     }
-
-    document.getElementById("zoomBtn").onclick = () => {
+    $("zoomBtn").onclick = () => {
       if (hints >= ZOOMS.length - 1) return;
       hints++;
-      sat.flyTo(sat.getCenter(), ZOOMS[hints], { duration: .8 });
+      sat.flyTo(sat.getCenter(), ZOOMS[hints], { duration: .7 });
       updateWorth();
     };
 
-    function answer(btn, correct) {
+    function answerName(btn, correct) {
       if (answered) return;
       answered = true;
-      const [name, lat, lon, fact] = rounds[round];
-      document.querySelectorAll(".opt").forEach(b => {
-        b.disabled = true;
-        if (b.textContent === name) b.classList.add("right");
-      });
+      const name = rounds[round][0];
+      document.querySelectorAll(".opt").forEach(b => { b.disabled = true; if (b.textContent === name) b.classList.add("right"); });
       if (!correct) btn.classList.add("wrong");
-      const pts = correct ? 3 - hints : 0;
-      score += pts;
-      rounds[round].result = correct;
-      document.getElementById("score").textContent = score;
-      document.getElementById("revealTitle").textContent = correct ? `✅ ${name}! +${pts}` : `❌ It was ${name}`;
-      document.getElementById("revealFact").textContent = fact;
-      document.getElementById("nextBtn").textContent = round + 1 < ROUNDS ? "Next →" : "See score";
-      document.getElementById("reveal").classList.add("show");
-      updateWorth();
-      drawDots();
-      showMini(lat, lon);
-      document.getElementById("reveal").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      finishRound(correct ? 3 - hints : 0, correct ? `Correct, it's ${name}` : `No, that was ${name}`);
     }
 
+    function dropPin(latlng) {
+      if (guessMarker) guessMarker.setLatLng(latlng);
+      else { guessMarker = L.circleMarker(latlng, { radius: 9, color: "#fff", weight: 3, fillColor: "#ffd23f", fillOpacity: 1 }).addTo(sat); layers.push(guessMarker); }
+      sfx.move();
+      $("lockBtn").disabled = false;
+    }
+    $("lockBtn").onclick = () => {
+      if (!guessMarker || answered) return;
+      answered = true; $("lockBtn").disabled = true;
+      const [name, lat, lon] = rounds[round], g = guessMarker.getLatLng();
+      const d = km([0, g.lat, g.lng], [0, lat, lon]);
+      const pts = d <= 6 ? 3 : d <= 18 ? 2 : d <= 45 ? 1 : 0;
+      layers.push(L.polyline([g, [lat, lon]], { color: "#fff", weight: 3, dashArray: "6 8" }).addTo(sat));
+      layers.push(L.circleMarker([lat, lon], { radius: 9, color: "#fff", weight: 3, fillColor: "#ff4458", fillOpacity: 1 }).addTo(sat));
+      sat.flyToBounds(L.latLngBounds([g, [lat, lon]]).pad(0.6), { duration: .7, maxZoom: 12 });
+      finishRound(pts, `${name} is ${d < 1 ? "right there" : Math.round(d) + " km away"}`);
+    };
+
+    function finishRound(pts, title) {
+      const [, lat, lon, fact] = rounds[round];
+      score += pts;
+      rounds[round].result = pts;
+      pts > 0 ? sfx.ok() : sfx.bad();
+      $("score").textContent = score;
+      $("revealTitle").textContent = `${title} (+${pts})`;
+      $("revealFact").textContent = fact;
+      $("nextBtn").textContent = round + 1 < ROUNDS ? "Next round" : "See my score";
+      $("reveal").classList.add("show");
+      $("mini").style.display = mode === "name" ? "" : "none";
+      updateWorth(); drawDots();
+      if (mode === "name") showMini(lat, lon);
+      $("reveal").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    let miniMarker = null;
     function showMini(lat, lon) {
       if (!mini) {
-        mini = L.map("mini", { zoomControl: false, attributionControl: true });
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          { attribution: "© OpenStreetMap", maxZoom: 18 }).addTo(mini);
+        mini = L.map("mini", { zoomControl: false });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap", maxZoom: 18 }).addTo(mini);
       }
       setTimeout(() => {
         mini.invalidateSize();
-        mini.fitBounds([[13.05, -16.85], [13.85, -13.8]]);
+        mini.fitBounds(GAMBIA);
         if (miniMarker) miniMarker.remove();
-        miniMarker = L.circleMarker([lat, lon], { radius: 9, color: "#fff", weight: 3, fillColor: "#ce1126", fillOpacity: 1 }).addTo(mini);
+        miniMarker = L.circleMarker([lat, lon], { radius: 9, color: "#fff", weight: 3, fillColor: "#ff4458", fillOpacity: 1 }).addTo(mini);
       }, 50);
     }
 
-    document.getElementById("nextBtn").onclick = () => {
-      round++;
-      if (round < ROUNDS) startRound(); else finish();
-    };
+    $("nextBtn").onclick = () => { round++; round < ROUNDS ? startRound() : finish(); };
 
     function drawDots() {
-      document.getElementById("dots").innerHTML = rounds.map((p, i) =>
-        `<i class="${p.result === true ? "good" : p.result === false ? "bad" : i === round ? "cur" : ""}"></i>`).join("");
+      $("dots").innerHTML = rounds.map((p, i) =>
+        `<i class="${p.result > 0 ? "good" : p.result === 0 ? "bad" : i === round ? "cur" : ""}"></i>`).join("");
     }
 
     function finish() {
-      const best = store.get("place-best", 0);
-      if (score > best) store.set("place-best", score);
-      const line = score >= 13 ? "You know the Gambia like a gele-gele driver! 🚐" :
-                   score >= 9 ? "Not bad at all - you get around." :
-                   score >= 5 ? "Time for a trip upcountry!" : "Did you ever leave your compound? 😅";
-      const squares = rounds.map(p => p.result ? "🟩" : "🟥").join("");
-      const text = `🛰️ Guess the Place: ${score}/15 ${squares}\n${line}\n${location.href}`;
-      const f = document.getElementById("final");
-      f.innerHTML = `<div class="big">${score}<span style="font-size:1.6rem">/15</span></div>
-        <p style="font-size:1.6rem;margin:.3em 0">${squares}</p>
-        <p>${line}</p><p class="muted">Your best: ${Math.max(score, best)}</p>
-        <div class="row" style="justify-content:center">
+      const key = mode === "name" ? "place-best" : "place-best-pin";
+      const best = Math.max(score, store.get(key, 0));
+      store.set(key, best);
+      const line = score >= 13 ? "You know the Gambia like a gele-gele driver." :
+                   score >= 9 ? "Not bad at all. You get around." :
+                   score >= 5 ? "Time for a trip upcountry." : "Have you ever left your compound?";
+      const emoji = rounds.map(p => p.result >= 3 ? "🟩" : p.result > 0 ? "🟨" : "🟥").join("");
+      const text = `Guess the Place (${mode === "name" ? "Name it" : "Pin it"}): ${score}/15 ${emoji}\n${line}\n${location.href}`;
+      const col = p => p.result >= 3 ? "var(--green)" : p.result > 0 ? "var(--yellow)" : "var(--red)";
+      $("final").innerHTML = `<h2>${mode === "name" ? "Name it" : "Pin it"}</h2>
+        <div class="big">${score}/15</div>
+        <div class="squares">${rounds.map(p => `<i style="background:${col(p)}"></i>`).join("")}</div>
+        <p>${line}</p><p class="muted">Your best: ${best}/15</p>
+        <div class="row" style="justify-content:center;margin-top:16px">
           <button class="btn green" id="shareBtn">Share</button>
-          <button class="btn" onclick="newGame()">Play again</button>
+          <button class="btn" id="againBtn">Play again</button>
+          <button class="btn ghost" id="menuBtn">Change mode</button>
         </div>`;
-      document.getElementById("shareBtn").onclick = () => shareText(text);
-      document.getElementById("game").style.display = "none";
-      f.style.display = "";
+      $("shareBtn").onclick = () => shareText(text);
+      $("againBtn").onclick = () => newGame(mode);
+      $("menuBtn").onclick = () => { $("final").style.display = "none"; $("menu").style.display = ""; showBests(); };
+      $("game").style.display = "none"; $("final").style.display = "";
+      if (score >= 9) { sfx.win(); confetti(); } else sfx.coin();
     }
 
-    newGame();
+    $("nameMode").onclick = () => newGame("name");
+    $("pinMode").onclick = () => newGame("pin");
+    addEventListener("online", () => $("offline").classList.remove("show"));
+    showBests();
   </script>
 </body>
 </html>
