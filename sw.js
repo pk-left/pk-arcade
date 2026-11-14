@@ -1,7 +1,7 @@
 // Service worker: keeps a copy of the site on the device so it opens with no data.
 // Strategy: answer from the saved copy straight away, and refresh that copy in the background,
 // so the next visit gets the newest version. Map tiles and other sites are never cached.
-const CACHE = "pk-arcade-v2";
+const CACHE = "pk-arcade-v3";
 const PAGES = ["", "wordle/", "guess-the-place/", "ataya/", "bridge/", "dish-quiz/", "names/", "soundboard/", "sky/"];
 const FILES = [
   ...PAGES.map(p => "/" + p),
@@ -14,7 +14,9 @@ const FILES = [
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: "reload" skips the browser's own cache, so the saved copy is always the newest release
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: "reload" }))))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))

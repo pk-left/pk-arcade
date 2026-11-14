@@ -2,5 +2,13 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
+# Styles and scripts change with each release, so browsers must re-check them.
+# (Pages link them with ?v=N as well, which forces a fresh copy after a redesign.)
 /assets/*
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=300
+
+/assets/fonts/*
+  Cache-Control: public, max-age=2592000
+
+/sw.js
+  Cache-Control: no-cache
