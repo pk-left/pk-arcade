@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Ataya Master · PK Arcade</title>
+  <meta name="description" content="Pour from high, build the foam, don't spill. Are you the real ataya boy?">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍵</text></svg>">
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    body { overscroll-behavior: none; }
+    .hud { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+    .meter { background: var(--card); border-radius: 12px; padding: 8px 10px; box-shadow: var(--shadow); }
+    .meter small { display: block; color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+    .meter b { font: 800 1.3rem var(--display); }
+    .bar { height: 7px; background: #eadfca; border-radius: 9px; overflow: hidden; margin-top: 3px; }
+    .bar i { display: block; height: 100%; background: var(--green); width: 0; transition: width .1s; }
+    .bar i.target { position: relative; }
+    #stage {
+      width: 100%; height: min(60vh, 460px); display: block; border-radius: var(--radius);
+      background: linear-gradient(#3b2a1d, #22170f); box-shadow: var(--shadow); touch-action: none; cursor: grab;
+    }
+    .tip { text-align: center; color: var(--muted); margin: 10px 0 0; }
+    .overlay {
+      position: fixed; inset: 0; display: none; place-items: center; background: rgba(20,12,5,.6); z-index: 50; padding: 16px;
+    }
+    .overlay.show { display: grid; }
+    .overlay .card { max-width: 420px; text-align: center; }
+    .overlay h2 { margin: 0 0 6px; font-size: 1.8rem; }
+    .stars { font-size: 2.2rem; letter-spacing: 4px; color: #e0a106; }
+  </style>
+</head>
+<body>
+  <div class="flag"></div>
+  <header class="topbar">
+    <a class="back" href="../">← Arcade</a>
+    <h1>Ataya Master 🍵</h1>
+  </header>
+  <main>
+    <div class="hud">
+      <div class="meter"><small>Foam</small><b id="foamTxt">0%</b><div class="bar"><i id="foamBar"></i></div></div>
+      <div class="meter"><small>Tea left</small><b id="teaTxt">100%</b><div class="bar"><i id="teaBar" style="background:#b5651d"></i></div></div>
+      <div class="meter"><small id="roundTxt">Round 1</small><b id="timeTxt">40s</b><div class="bar"><i id="timeBar" style="background:var(--blue)"></i></div></div>
+    </div>
+    <canvas id="stage"></canvas>
+    <p class="tip"><b>Hold</b> to pour · <b>slide up</b> to pour from higher (more foam, but your hand shakes) · let go when the guide turns red · keyboard: Space, ↑/↓</p>
+  </main>
+
+  <div class="overlay show" id="ov">
+    <div class="card" id="ovCard"></div>
+  </div>
+
+  <script src="../assets/common.js"></script>
+  <script>
+  // ---------------------------------------------------------------------------
+  // Game model
+  //   Pouring moves tea from the source glass to the other one.
+  //   Foam grows with pour height; the stream wobbles more the higher you pour,
+  //   and tea that misses the glass is lost. Foam slowly settles over time.
+  //   Reach the round's foam target before time runs out, with tea left.
+  // ---------------------------------------------------------------------------
+  const ROUNDS = [
+    { name: "First round", sub: "Lewel - strong and bitter", target: 55, time: 40, wobble: 1.0 },
+    { name: "Second round", sub: "Mint goes in - sweeter", target: 70, time: 40, wobble: 1.2 },
+    { name: "Third round", sub: "Sweetest - the foam must be perfect", target: 85, time: 45, wobble: 1.4 },
+  ];
+  const CAP = 100;               // tea per glass when full
+  const cv = document.getElementById("stage");
+  const ctx = cv.getContext("2d");
+  let W, H, DPR;
+
+  let g, roundIdx = 0, totalScore = 0, running = false, last = 0;
+  const input = { pouring: false, height: 0.35, keyUp: false, keyDown: false, startY: 0, startH: 0 };
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  addEventListener("resize", resize);
+
+  function newRound() {
+    const R = ROUNDS[roundIdx];
+    g = {
+      R, src: 0,
+      tea: [CAP, 0],          // liquid in each glass
+      foam: [0, 0],           // foam height (0..100) on each glass
+      lost: 0, t: R.time, phase: 0, wobbleX: 0,
+      bubbles: [], drops: [],
+      pourT: 0,
+    };
+    input.height = 0.35;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Controls: press & hold to pour; drag vertically to change height.
+  // ---------------------------------------------------------------------------
+  cv.addEventListener("pointerdown", e => {
+    if (!running) return;
+    cv.setPointerCapture(e.pointerId);
+    input.pouring = true; input.startY = e.clientY; input.startH = input.height;
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!input.pouring) return;
+    input.height = clamp(input.startH + (input.startY - e.clientY) / (H * 0.6), 0, 1);
+  });
+  const stop = () => { input.pouring = false; };
+  cv.addEventListener("pointerup", stop);
+  cv.addEventListener("pointercancel", stop);
+  addEventListener("keydown", e => {
+    if (e.code === "Space") { input.pouring = running; e.preventDefault(); }
+    if (e.code === "ArrowUp") { input.keyUp = true; e.preventDefault(); }
+    if (e.code === "ArrowDown") { input.keyDown = true; e.preventDefault(); }
+  });
+  addEventListener("keyup", e => {
+    if (e.code === "Space") input.pouring = false;
+    if (e.code === "ArrowUp") input.keyUp = false;
+    if (e.code === "ArrowDown") input.keyDown = false;
+  });
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------------------------------------------------------------------------
+  // Update
+  // ---------------------------------------------------------------------------
+  function update(dt) {
+    if (input.keyUp) input.height = clamp(input.height + dt * 0.7, 0, 1);
+    if (input.keyDown) input.height = clamp(input.height - dt * 0.7, 0, 1);
+
+    g.t -= dt;
+    g.phase += dt * (2.2 + 2.5 * input.height);
+    const s = g.src, d = 1 - s;
+    // Stream wobble grows with height and round difficulty (sum of two sines feels "hand-like")
+    g.wobbleX = (Math.sin(g.phase * 1.7) * 0.6 + Math.sin(g.phase * 3.1 + 1) * 0.4) * input.height * g.R.wobble;
+
+    if (input.pouring && g.tea[s] > 0) {
+      const rate = 38 + 20 * (1 - input.height);            // tea per second
+      const amt = Math.min(g.tea[s], rate * dt);
+      g.tea[s] -= amt;
+      const miss = Math.max(0, Math.abs(g.wobbleX) - 0.55); // the stream leaves the glass mouth
+      const spilt = amt * clamp(miss * 3, 0, 1);
+      g.lost += spilt;
+      g.tea[d] += amt - spilt;
+      // foam travels with the tea, and the impact whips in more air: higher pour = more foam
+      const carried = g.foam[s] * (amt / (g.tea[s] + amt));
+      g.foam[s] -= carried;
+      const foamGain = (amt - spilt) * (0.02 + 0.7 * input.height ** 2);
+      g.foam[d] = clamp(g.foam[d] + carried * (1 - spilt / amt) + foamGain, 0, 100);
+      g.pourT += dt;
+      if (Math.random() < dt * 30 * input.height) addBubble(d);
+      if (spilt > 0 && Math.random() < 0.6) g.drops.push({ x: 0, y: 0, vx: (Math.random() - .5) * 120, vy: -40, life: 1 });
+    }
+    // switch glasses automatically when the source is empty
+    if (g.tea[s] <= 0.01 && !input.pouring) {
+      g.foam[d] += g.foam[s];
+      g.foam[s] = 0;
+      g.src = d;
+    }
+    // foam settles slowly (faster when there's lots of it)
+    for (const i of [0, 1]) g.foam[i] = Math.max(0, g.foam[i] - dt * (2.0 + g.foam[i] * 0.035));
+
+    g.bubbles = g.bubbles.filter(b => (b.life -= dt) > 0);
+    g.drops = g.drops.filter(p => { p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; return (p.life -= dt) > 0; });
+
+    const foamNow = foamOfMain();
+    const teaLeft = 100 * (1 - g.lost / CAP);
+    if (foamNow >= g.R.target && !input.pouring) end(true);   // stop pouring once the foam is right
+    else if (teaLeft < 35) end(false, "Too much tea on the floor! 😬");
+    else if (g.t <= 0) end(foamNow >= g.R.target, foamNow >= g.R.target ? "" : "Time's up - not enough foam.");
+    hud(foamNow, teaLeft);
+  }
+
+  // the foam that counts is on the glass holding most of the tea
+  function foamOfMain() { return g.tea[0] >= g.tea[1] ? g.foam[0] : g.foam[1]; }
+
+  function addBubble(i) {
+    g.bubbles.push({ i, x: Math.random(), r: 2 + Math.random() * 4, life: 0.6 + Math.random() * 0.6 });
+  }
+
+  function hud(foamNow, teaLeft) {
+    document.getElementById("foamTxt").innerHTML = `${Math.round(foamNow)}% <span class="muted" style="font-size:.8rem">/ ${g.R.target}%</span>`;
+    const fb = document.getElementById("foamBar");
+    fb.style.width = foamNow + "%";
+    fb.style.background = foamNow >= g.R.target ? "var(--green)" : "#d9a21b";
+    document.getElementById("teaTxt").textContent = Math.round(teaLeft) + "%";
+    document.getElementById("teaBar").style.width = teaLeft + "%";
+    document.getElementById("timeTxt").textContent = Math.max(0, Math.ceil(g.t)) + "s";
+    document.getElementById("timeBar").style.width = clamp(100 * g.t / g.R.time, 0, 100) + "%";
+    document.getElementById("roundTxt").textContent = `Round ${roundIdx + 1} of 3`;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Drawing
+  // ---------------------------------------------------------------------------
+  function glassGeom(i) {
+    const gw = Math.min(W * 0.17, 90), gh = gw * 1.25;
+    const baseY = H * 0.88;
+    const cx = i === 0 ? W * 0.3 : W * 0.7;
+    return { cx, baseY, gw, gh, top: baseY - gh };
+  }
+
+  function drawGlass(i, lifted, tiltX, tiltY) {
+    const G = glassGeom(i);
+    ctx.save();
+    if (lifted) {
+      // the source glass is held up above the other one and tipped
+      const liftY = H * 0.12 + (1 - input.height) * H * 0.28;
+      ctx.translate(tiltX, liftY - G.top);
+      ctx.translate(G.cx, G.baseY - G.gh / 2);
+      ctx.rotate((i === 0 ? 1 : -1) * (input.pouring ? 1.9 : 0.35));
+      ctx.translate(-G.cx, -(G.baseY - G.gh / 2));
+    }
+    const topW = G.gw, botW = G.gw * 0.72;
+    const path = new Path2D();
+    path.moveTo(G.cx - topW / 2, G.top);
+    path.lineTo(G.cx - botW / 2, G.baseY);
+    path.lineTo(G.cx + botW / 2, G.baseY);
+    path.lineTo(G.cx + topW / 2, G.top);
+
+    // liquid
+    const fill = g.tea[i] / CAP;
+    const foamH = (g.foam[i] / 100) * G.gh * 0.45 * Math.min(1, fill * 2.2);
+    if (fill > 0.001) {
+      ctx.save();
+      ctx.clip(path);
+      const lvl = G.baseY - G.gh * 0.92 * fill;
+      const grad = ctx.createLinearGradient(0, lvl, 0, G.baseY);
+      grad.addColorStop(0, "#c46a12"); grad.addColorStop(1, "#5a2a06");
+      ctx.fillStyle = grad;
+      ctx.fillRect(G.cx - topW, lvl, topW * 2, G.gh);
+      // foam on top of the tea
+      if (foamH > 0.5) {
+        const fg = ctx.createLinearGradient(0, lvl - foamH, 0, lvl);
+        fg.addColorStop(0, "#fff8e8"); fg.addColorStop(1, "#e8c48f");
+        ctx.fillStyle = fg;
+        ctx.fillRect(G.cx - topW, lvl - foamH, topW * 2, foamH + 1);
+        ctx.fillStyle = "rgba(255,255,255,.7)";
+        for (let k = 0; k < 7; k++) {
+          ctx.beginPath();
+          ctx.arc(G.cx - topW / 2 + (k + .5) * topW / 7, lvl - foamH, 3 + (k % 3), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      for (const b of g.bubbles.filter(b => b.i === i)) {
+        ctx.strokeStyle = "rgba(255,255,255,.8)";
+        ctx.beginPath();
+        ctx.arc(G.cx - topW / 2 + b.x * topW, lvl - foamH - (1 - b.life) * 14, b.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // glass outline and shine
+    ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineWidth = 2.5;
+    ctx.stroke(path);
+    ctx.fillStyle = "rgba(255,255,255,.08)"; ctx.fill(path);
+    ctx.fillStyle = "rgba(255,255,255,.25)";
+    ctx.fillRect(G.cx - topW / 2 + 7, G.top + 8, 4, G.gh * 0.6);
+    ctx.restore();
+    return G;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // table
+    ctx.fillStyle = "#6b4423";
+    ctx.fillRect(0, H * 0.88, W, H * 0.12);
+    ctx.fillStyle = "#7a5030";
+    ctx.fillRect(0, H * 0.88, W, 4);
+
+    const s = g.src, d = 1 - s;
+    const Gd = drawGlass(d, false);
+    // the held glass hovers above and slightly to the side of the receiving glass
+    const offsetX = (Gd.cx - glassGeom(s).cx) + (s === 0 ? -Gd.gw * 0.55 : Gd.gw * 0.55);
+    drawGlass(s, true, offsetX + g.wobbleX * Gd.gw * 0.6, 0);
+
+    // stream
+    const liftY = H * 0.12 + (1 - input.height) * H * 0.28;
+    const lipX = Gd.cx + (s === 0 ? -Gd.gw * 0.05 : Gd.gw * 0.05);
+    const lipY = liftY + Gd.gh * 0.25;
+    if (!input.pouring && running) {
+      // aiming guide: where the stream would land right now
+      const ax = Gd.cx + g.wobbleX * Gd.gw;
+      const safe = Math.abs(g.wobbleX) <= 0.55;
+      ctx.setLineDash([3, 6]); ctx.lineWidth = 2;
+      ctx.strokeStyle = safe ? "rgba(140,220,120,.6)" : "rgba(255,90,90,.6)";
+      ctx.beginPath(); ctx.moveTo(lipX + g.wobbleX * Gd.gw * 0.6, lipY); ctx.lineTo(ax, Gd.top); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (input.pouring && g.tea[s] > 0) {
+      const fill = g.tea[d] / CAP;
+      const surface = Gd.baseY - Gd.gh * 0.92 * fill;
+      const endX = Gd.cx + g.wobbleX * Gd.gw;
+      ctx.strokeStyle = "#c46a12"; ctx.lineWidth = 4; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(lipX + g.wobbleX * Gd.gw * 0.6, lipY);
+      ctx.quadraticCurveTo(lipX + (endX - lipX) * 0.2, (lipY + surface) / 2, endX, Math.abs(g.wobbleX) > 0.55 ? Gd.baseY : surface);
+      ctx.stroke();
+      for (const p of g.drops) {
+        ctx.fillStyle = "#c46a12";
+        ctx.beginPath(); ctx.arc(endX + p.x, Gd.baseY + p.y, 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    // height gauge
+    const gx = W - 22, gy0 = H * 0.08, gy1 = H * 0.8;
+    ctx.fillStyle = "rgba(255,255,255,.15)"; ctx.fillRect(gx, gy0, 8, gy1 - gy0);
+    const hy = gy1 - input.height * (gy1 - gy0);
+    ctx.fillStyle = input.height > 0.7 ? "#ce1126" : input.height > 0.4 ? "#d9a21b" : "#3a7728";
+    ctx.fillRect(gx - 4, hy - 4, 16, 8);
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.font = "600 11px Inter, sans-serif"; ctx.textAlign = "right";
+    ctx.fillText("high", gx - 6, gy0 + 10); ctx.fillText("low", gx - 6, gy1);
+  }
+
+  function loop(t) {
+    const dt = Math.min(0.05, (t - last) / 1000 || 0);
+    last = t;
+    if (running) update(dt);
+    if (g) draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Screens
+  // ---------------------------------------------------------------------------
+  const ov = document.getElementById("ov"), card = document.getElementById("ovCard");
+
+  function showIntro() {
+    card.innerHTML = `<h2>Ataya Master 🍵</h2>
+      <p>Pour the tea between two glasses to build the <b>foam</b>.<br>
+      Pour from <b>high</b> for more foam - but your hand shakes and tea spills.</p>
+      <p class="muted">Hit the foam target before time runs out. Three rounds, like real ataya.</p>
+      <button class="btn red" id="go">Start brewing</button>`;
+    document.getElementById("go").onclick = () => { roundIdx = 0; totalScore = 0; startRound(); };
+    ov.classList.add("show");
+  }
+
+  function startRound() {
+    newRound();
+    const R = ROUNDS[roundIdx];
+    card.innerHTML = `<h2>${R.name}</h2><p>${R.sub}</p><p>Foam target: <b>${R.target}%</b></p>
+      <button class="btn" id="go">Pour!</button>`;
+    document.getElementById("go").onclick = () => { ov.classList.remove("show"); running = true; };
+    ov.classList.add("show");
+  }
+
+  function end(ok, why = "") {
+    running = false; input.pouring = false;
+    const foam = foamOfMain(), tea = 100 * (1 - g.lost / CAP);
+    const stars = ok ? (tea > 90 && g.t > 10 ? 3 : tea > 75 ? 2 : 1) : 0;
+    const pts = ok ? Math.round(foam * 2 + tea * 3 + g.t * 5) : 0;
+    totalScore += pts;
+    const last = roundIdx === ROUNDS.length - 1;
+    if (!ok) {
+      card.innerHTML = `<h2>Waaw... no 😅</h2><p>${why}</p><p class="stars">☆☆☆</p>
+        <button class="btn red" id="go">Try again</button>`;
+      document.getElementById("go").onclick = startRound;
+    } else if (!last) {
+      card.innerHTML = `<h2>Rafet na! ✨</h2><p class="stars">${"★".repeat(stars)}${"☆".repeat(3 - stars)}</p>
+        <p>Foam ${Math.round(foam)}% · Tea kept ${Math.round(tea)}% · +${pts} points</p>
+        <button class="btn green" id="go">Next round →</button>`;
+      document.getElementById("go").onclick = () => { roundIdx++; startRound(); };
+    } else {
+      const best = store.get("ataya-best", 0);
+      store.set("ataya-best", Math.max(best, totalScore));
+      const title = totalScore > 1500 ? "Grand master of ataya 👑" : totalScore > 1200 ? "Real ataya boy 💪" : "Ataya apprentice ☕";
+      const text = `🍵 Ataya Master: ${totalScore} points - ${title}\nCan you beat me? ${location.href}`;
+      card.innerHTML = `<h2>${title}</h2><p class="stars">${"★".repeat(stars)}${"☆".repeat(3 - stars)}</p>
+        <p>All three rounds served! Total <b>${totalScore}</b> points<br><span class="muted">Your best: ${Math.max(best, totalScore)}</span></p>
+        <div class="row" style="justify-content:center">
+          <button class="btn green" id="share">Share</button>
+          <button class="btn" id="go">Brew again</button>
+        </div>`;
+      document.getElementById("share").onclick = () => shareText(text);
+      document.getElementById("go").onclick = () => { roundIdx = 0; totalScore = 0; startRound(); };
+    }
+    ov.classList.add("show");
+  }
+
+  resize();
+  newRound();
+  showIntro();
+  requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

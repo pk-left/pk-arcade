@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Wolof Wordle · PK Arcade</title>
+  <meta name="description" content="Guess today's 5-letter Wolof word in six tries.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🟩</text></svg>">
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    :root { --ok: #3a7728; --near: #d9a21b; --no: #8a8174; }
+    main { display: flex; flex-direction: column; align-items: center; }
+    .board { display: grid; grid-template-rows: repeat(6, 1fr); gap: 6px; margin: 8px 0 18px; }
+    .rowg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .rowg.shake { animation: shake .4s; }
+    @keyframes shake { 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+    .tileg {
+      width: min(15vw, 62px); height: min(15vw, 62px);
+      display: grid; place-items: center; text-transform: uppercase;
+      font: 800 clamp(1.4rem, 6vw, 2rem) var(--display);
+      border: 2px solid #d8ccb5; border-radius: 8px; background: var(--card);
+    }
+    .tileg.filled { border-color: #8a8174; animation: pop .1s; }
+    @keyframes pop { 50% { transform: scale(1.08); } }
+    .tileg.flip { animation: flip .5s ease forwards; }
+    @keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+    .ok { background: var(--ok) !important; border-color: var(--ok) !important; color: #fff; }
+    .near { background: var(--near) !important; border-color: var(--near) !important; color: #fff; }
+    .no { background: var(--no) !important; border-color: var(--no) !important; color: #fff; }
+
+    .kb { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 7px; user-select: none; }
+    .kb .r { display: flex; gap: 5px; justify-content: center; }
+    .key {
+      flex: 1; height: 54px; border: 0; border-radius: 7px; background: #e6d9bf;
+      font: 700 1.05rem var(--body); text-transform: uppercase; cursor: pointer; color: var(--ink);
+    }
+    .key.wide { flex: 1.6; font-size: .8rem; }
+    .key:active { filter: brightness(.9); }
+
+    dialog { border: 0; border-radius: var(--radius); box-shadow: var(--shadow); max-width: 380px; width: 92%; padding: 24px; }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    dialog h2 { margin: 0 0 6px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; margin: 14px 0; }
+    .stats b { display: block; font: 800 1.8rem var(--display); }
+    .stats span { font-size: .75rem; color: var(--muted); }
+    .meaning { background: var(--sand); border-radius: 12px; padding: 10px 14px; margin: 10px 0; }
+    .help-ex { display: flex; gap: 4px; margin: 6px 0; }
+    .help-ex .tileg { width: 38px; height: 38px; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <div class="flag"></div>
+  <header class="topbar">
+    <a class="back" href="../">← Arcade</a>
+    <h1>Wolof Wordle</h1>
+    <span style="flex:1"></span>
+    <button class="btn ghost" id="helpBtn" aria-label="How to play">?</button>
+  </header>
+  <main>
+    <p class="muted center" id="sub" style="margin:0">Guess today's Wolof word</p>
+    <div class="board" id="board"></div>
+    <div class="kb" id="kb"></div>
+  </main>
+
+  <dialog id="help">
+    <h2>How to play</h2>
+    <p>Guess the <b>5-letter Wolof word</b> in 6 tries. After each guess the tiles change colour:</p>
+    <div class="help-ex"><div class="tileg ok">a</div><div class="tileg">t</div><div class="tileg">a</div><div class="tileg">y</div><div class="tileg">a</div></div>
+    <p class="muted" style="margin-top:0">Green: right letter, right place.</p>
+    <div class="help-ex"><div class="tileg">s</div><div class="tileg near">a</div><div class="tileg">b</div><div class="tileg">a</div><div class="tileg">r</div></div>
+    <p class="muted" style="margin-top:0">Yellow: the letter is in the word, but somewhere else.</p>
+    <div class="help-ex"><div class="tileg">x</div><div class="tileg">a</div><div class="tileg">r</div><div class="tileg no">i</div><div class="tileg">t</div></div>
+    <p class="muted" style="margin-top:0">Grey: the letter is not in the word.</p>
+    <p>Words are written without accents (ë → e). A new word comes every day at midnight, Gambian time.</p>
+    <div class="center"><button class="btn" onclick="this.closest('dialog').close()">Let's play</button></div>
+  </dialog>
+
+  <dialog id="done">
+    <h2 id="doneTitle"></h2>
+    <div class="meaning" id="meaning"></div>
+    <div class="stats" id="stats"></div>
+    <div class="row" style="justify-content:center">
+      <button class="btn green" id="shareBtn">Share result</button>
+      <button class="btn ghost" onclick="this.closest('dialog').close()">Close</button>
+    </div>
+    <p class="muted center" id="next" style="margin-bottom:0"></p>
+  </dialog>
+
+  <script src="../assets/common.js"></script>
+  <script src="words.js"></script>
+  <script>
+    const ROWS = 6, LEN = 5;
+    const day = dayNumber();
+    const puzzleNo = day + 1;
+    const [answer, meaning] = WORDS[((day % WORDS.length) + WORDS.length) % WORDS.length];
+
+    let state = store.get("wordle-state", null);
+    if (!state || state.day !== day) state = { day, guesses: [], finished: false, won: false };
+    const stats = store.get("wordle-stats", { played: 0, wins: 0, streak: 0, best: 0, dist: [0, 0, 0, 0, 0, 0], lastWinDay: null });
+    let current = "";
+
+    document.getElementById("sub").textContent = `Puzzle #${puzzleNo}`;
+
+    // ----- board and keyboard -----
+    const board = document.getElementById("board");
+    for (let r = 0; r < ROWS; r++) {
+      const row = document.createElement("div");
+      row.className = "rowg";
+      for (let c = 0; c < LEN; c++) row.appendChild(Object.assign(document.createElement("div"), { className: "tileg" }));
+      board.appendChild(row);
+    }
+    const kb = document.getElementById("kb");
+    ["qwertyuiop", "asdfghjkl", "+zxcvbnm-"].forEach(line => {
+      const r = document.createElement("div");
+      r.className = "r";
+      for (const ch of line) {
+        const k = document.createElement("button");
+        k.className = "key";
+        if (ch === "+") { k.textContent = "Enter"; k.classList.add("wide"); k.dataset.k = "Enter"; }
+        else if (ch === "-") { k.textContent = "⌫"; k.classList.add("wide"); k.dataset.k = "Backspace"; }
+        else { k.textContent = ch; k.dataset.k = ch; }
+        r.appendChild(k);
+      }
+      kb.appendChild(r);
+    });
+    kb.addEventListener("click", e => { const k = e.target.closest(".key"); if (k) press(k.dataset.k); });
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector("dialog[open]")) return;
+      if (e.key === "Enter" || e.key === "Backspace" || /^[a-z]$/i.test(e.key)) press(e.key.length === 1 ? e.key.toLowerCase() : e.key);
+    });
+
+    function score(guess) {
+      // Two passes so repeated letters are coloured correctly (e.g. "ataya")
+      const res = Array(LEN).fill("no");
+      const left = {};
+      for (let i = 0; i < LEN; i++) {
+        if (guess[i] === answer[i]) res[i] = "ok";
+        else left[answer[i]] = (left[answer[i]] || 0) + 1;
+      }
+      for (let i = 0; i < LEN; i++) {
+        if (res[i] !== "ok" && left[guess[i]] > 0) { res[i] = "near"; left[guess[i]]--; }
+      }
+      return res;
+    }
+
+    function paintRow(r, word, colours, animate) {
+      const tiles = board.children[r].children;
+      for (let i = 0; i < LEN; i++) {
+        tiles[i].textContent = word[i] || "";
+        tiles[i].className = "tileg" + (word[i] ? " filled" : "");
+        if (colours) {
+          const apply = () => tiles[i].classList.add(colours[i]);
+          if (animate) { setTimeout(() => { tiles[i].classList.add("flip"); setTimeout(apply, 250); }, i * 250); }
+          else apply();
+        }
+      }
+    }
+
+    function paintKeys() {
+      const rank = { no: 1, near: 2, ok: 3 };
+      const best = {};
+      state.guesses.forEach(g => score(g).forEach((c, i) => {
+        if (!best[g[i]] || rank[c] > rank[best[g[i]]]) best[g[i]] = c;
+      }));
+      kb.querySelectorAll(".key").forEach(k => {
+        k.classList.remove("ok", "near", "no");
+        if (best[k.dataset.k]) k.classList.add(best[k.dataset.k]);
+      });
+    }
+
+    function press(k) {
+      if (state.finished) return;
+      if (k === "Backspace") current = current.slice(0, -1);
+      else if (k === "Enter") return submit();
+      else if (current.length < LEN) current += k;
+      paintRow(state.guesses.length, current);
+    }
+
+    function submit() {
+      const r = state.guesses.length;
+      if (current.length < LEN) {
+        board.children[r].classList.remove("shake");
+        void board.children[r].offsetWidth;
+        board.children[r].classList.add("shake");
+        return toast("Not enough letters");
+      }
+      const guess = current;
+      state.guesses.push(guess);
+      current = "";
+      paintRow(r, guess, score(guess), true);
+      setTimeout(paintKeys, LEN * 250 + 100);
+
+      if (guess === answer || state.guesses.length === ROWS) {
+        state.finished = true;
+        state.won = guess === answer;
+        updateStats();
+        setTimeout(() => {
+          toast(state.won ? ["Jamm rekk! 🎉", "Rafet na!", "Waaw! Brilliant", "Nice one!", "Phew!", "Just made it!"][r] : answer.toUpperCase());
+          setTimeout(showDone, 1200);
+        }, LEN * 250 + 300);
+      }
+      store.set("wordle-state", state);
+    }
+
+    function updateStats() {
+      stats.played++;
+      if (state.won) {
+        stats.wins++;
+        stats.dist[state.guesses.length - 1]++;
+        stats.streak = stats.lastWinDay === day - 1 ? stats.streak + 1 : 1;
+        stats.best = Math.max(stats.best, stats.streak);
+        stats.lastWinDay = day;
+      } else stats.streak = 0;
+      store.set("wordle-stats", stats);
+    }
+
+    function resultText() {
+      const emoji = { ok: "🟩", near: "🟨", no: "⬜" };
+      const grid = state.guesses.map(g => score(g).map(c => emoji[c]).join("")).join("\n");
+      return `Wolof Wordle #${puzzleNo} ${state.won ? state.guesses.length : "X"}/6\n\n${grid}\n\n${location.origin}${location.pathname}`;
+    }
+
+    function showDone() {
+      document.getElementById("doneTitle").textContent = state.won ? "Rafet na! 🎉" : "Next time!";
+      document.getElementById("meaning").innerHTML = `<b style="text-transform:uppercase;font-family:var(--display);font-size:1.3rem">${answer}</b><br>${meaning}`;
+      const pct = stats.played ? Math.round(100 * stats.wins / stats.played) : 0;
+      document.getElementById("stats").innerHTML =
+        [[stats.played, "Played"], [pct, "Win %"], [stats.streak, "Streak"], [stats.best, "Best"]]
+          .map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+      const now = new Date();
+      const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+      const h = Math.floor((midnight - now) / 3600000), m = Math.floor((midnight - now) / 60000) % 60;
+      document.getElementById("next").textContent = `Next word in ${h}h ${m}m`;
+      document.getElementById("done").showModal();
+    }
+    document.getElementById("shareBtn").onclick = () => shareText(resultText());
+    document.getElementById("helpBtn").onclick = () => document.getElementById("help").showModal();
+
+    // restore today's progress
+    state.guesses.forEach((g, r) => paintRow(r, g, score(g), false));
+    paintKeys();
+    if (state.finished) setTimeout(showDone, 400);
+    else if (!store.get("wordle-seen-help", false)) {
+      document.getElementById("help").showModal();
+      store.set("wordle-seen-help", true);
+    }
+  </script>
+</body>
+</html>

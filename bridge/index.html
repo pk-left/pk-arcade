@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Bridge Builder · PK Arcade</title>
+  <meta name="description" content="Build a truss bridge, send the car across, and see if it holds.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌉</text></svg>">
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .tool { font: 700 .95rem var(--display); border: 0; padding: 8px 14px; border-radius: 999px; cursor: pointer; background: var(--card); box-shadow: var(--shadow); color: var(--ink); }
+    .tool.on { background: var(--ink); color: #fff; }
+    .stat { background: var(--card); box-shadow: var(--shadow); padding: 6px 12px; border-radius: 12px; font-weight: 600; }
+    .stat.over { background: var(--red); color: #fff; }
+    #cv { width: 100%; aspect-ratio: 4 / 3; max-height: min(62vh, 520px); display: block; border-radius: var(--radius); box-shadow: var(--shadow); touch-action: none; background: #bfe3f5; }
+    .msg { text-align: center; font-weight: 600; margin: 10px 0 0; min-height: 1.5em; }
+    .levels { display: flex; gap: 6px; }
+    .levels button { width: 38px; height: 38px; border-radius: 50%; border: 0; font: 800 1rem var(--display); cursor: pointer; background: var(--card); box-shadow: var(--shadow); }
+    .levels button.on { background: var(--blue); color: #fff; }
+    .levels button.done::after { content: "✓"; font-size: .7rem; vertical-align: super; color: var(--green); }
+    .levels button.on.done::after { color: #9ef08a; }
+    details { margin-top: 14px; }
+    summary { cursor: pointer; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="flag"></div>
+  <header class="topbar">
+    <a class="back" href="../">← Arcade</a>
+    <h1>Bridge Builder 🌉</h1>
+  </header>
+  <main>
+    <div class="bar">
+      <div class="levels" id="levels"></div>
+      <span style="flex:1"></span>
+      <span class="stat" id="cost">Cost: D0</span>
+    </div>
+    <div class="bar" id="editBar">
+      <button class="tool on" data-tool="road">🛣️ Road</button>
+      <button class="tool" data-tool="beam">🔩 Beam</button>
+      <button class="tool" data-tool="erase">🧽 Delete</button>
+      <button class="tool" id="undo">↶ Undo</button>
+      <button class="tool" id="clear">Clear</button>
+      <span style="flex:1"></span>
+      <button class="btn green" id="go">▶ Test with car</button>
+    </div>
+    <div class="bar" id="runBar" style="display:none">
+      <button class="btn" id="back">✎ Back to editing</button>
+      <label class="stat"><input type="checkbox" id="slow"> Slow motion</label>
+    </div>
+    <canvas id="cv"></canvas>
+    <p class="msg" id="msg"></p>
+    <details>
+      <summary>How to play</summary>
+      <p>Tap a <b>dot</b> (an anchor on the cliff or a joint you built), then tap another spot to add a member. Members can be up to 3 m long.
+      <b>Road</b> is what the car drives on - it must connect the two cliffs. <b>Beams</b> make the triangles that hold the road up.
+      Press <b>Test</b> to send the car across. Colours show the force in each member: <span style="color:#2f6fd6;font-weight:700">blue = tension (pulled)</span>,
+      <span style="color:#d6402f;font-weight:700">red = compression (pushed)</span>. Too much force and it snaps!</p>
+      <p class="muted">The physics: every joint is a mass, every member is a stiff spring. Members break above their strength - and compression members are weaker,
+      because long thin struts buckle. Triangles are strong because a triangle can't change shape without stretching a member. That's why real bridges (and cranes, and roofs) are full of them.</p>
+    </details>
+  </main>
+
+  <script src="../assets/common.js"></script>
+  <script>
+  // ---------------------------------------------------------------------------
+  // Levels (units: metres, y up; the road level of the cliffs is y = 0)
+  // ---------------------------------------------------------------------------
+  const LEVELS = [
+    { name: "Bakau creek", gap: [4, 12], anchors: [[4, 0], [12, 0], [4, -2], [12, -2]], budget: 5000, car: 600 },
+    { name: "Mangrove channel", gap: [3, 15], anchors: [[3, 0], [15, 0], [3, -2], [15, -2]], budget: 7500, car: 450 },
+    { name: "Brikama river", gap: [3, 17], anchors: [[3, 0], [17, 0], [3, -2], [17, -2], [10, -4]], budget: 9500, car: 650, pier: 10 },
+    { name: "Big truck", gap: [4, 14], anchors: [[4, 0], [14, 0], [4, -2], [14, -2]], budget: 10000, car: 900 },
+  ];
+  const WORLD_W = 20, WORLD_TOP = 4, WORLD_BOTTOM = -7;
+  const MAX_LEN = 3.05;
+  const MAT = {
+    road: { cost: 200, k: 6e5, tens: 14000, comp: 11000, mass: 30 },   // per metre where relevant
+    beam: { cost: 120, k: 4e5, tens: 12000, comp: 9000, mass: 15 },
+  };
+  const G = 9.81;
+
+  const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+  let W, H, scale, ox, oy;
+  let lvl = 0, nodes = [], members = [], history = [], tool = "road", selected = null, hover = null;
+  let mode = "edit", sim = null;
+  const done = store.get("bridge-done", []);
+
+  // ---------------------------------------------------------------------------
+  // Geometry helpers
+  // ---------------------------------------------------------------------------
+  function resize() {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // frame the current level: the gap plus a bit of cliff on each side
+    const [g0, g1] = LEVELS[lvl].gap, x0 = g0 - 2.5, x1 = g1 + 2.5;
+    scale = Math.min(W / (x1 - x0), H / (WORLD_TOP - WORLD_BOTTOM));
+    ox = (W - (x1 + x0) * scale) / 2; oy = (H - (WORLD_TOP - WORLD_BOTTOM) * scale) / 2 + WORLD_TOP * scale;
+  }
+  const sx = x => ox + x * scale, sy = y => oy - y * scale;
+  const wx = px => (px - ox) / scale, wy = py => (oy - py) / scale;
+  const L = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  function loadLevel(i) {
+    lvl = i; mode = "edit"; sim = null; selected = null; history = [];
+    if (W) resize();
+    const saved = store.get("bridge-l" + i, null);
+    nodes = LEVELS[i].anchors.map(([x, y]) => ({ x, y, fixed: true }));
+    members = [];
+    if (saved) {
+      saved.nodes.forEach(([x, y]) => nodes.push({ x, y, fixed: false }));
+      saved.members.forEach(([a, b, t]) => members.push({ a, b, type: t }));
+    }
+    ui(); msg(`Level ${i + 1}: ${LEVELS[i].name} - budget D${LEVELS[i].budget.toLocaleString()}, car ${LEVELS[i].car} kg`);
+  }
+
+  function save() {
+    store.set("bridge-l" + lvl, {
+      nodes: nodes.filter(n => !n.fixed).map(n => [n.x, n.y]),
+      members: members.map(m => [m.a, m.b, m.type]),
+    });
+  }
+
+  const cost = () => Math.round(members.reduce((s, m) => s + MAT[m.type].cost * L(nodes[m.a], nodes[m.b]), 0));
+
+  function ui() {
+    document.getElementById("levels").innerHTML = LEVELS.map((l, i) =>
+      `<button class="${i === lvl ? "on" : ""} ${done.includes(i) ? "done" : ""}" data-l="${i}">${i + 1}</button>`).join("");
+    const c = cost(), el = document.getElementById("cost");
+    el.textContent = `Cost: D${c.toLocaleString()} / ${LEVELS[lvl].budget.toLocaleString()}`;
+    el.classList.toggle("over", c > LEVELS[lvl].budget);
+    document.getElementById("editBar").style.display = mode === "edit" ? "" : "none";
+    document.getElementById("runBar").style.display = mode === "edit" ? "none" : "";
+  }
+  document.getElementById("levels").onclick = e => { const b = e.target.closest("button"); if (b) loadLevel(+b.dataset.l); };
+  const msg = t => document.getElementById("msg").textContent = t;
+
+  // ---------------------------------------------------------------------------
+  // Editing
+  // ---------------------------------------------------------------------------
+  document.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => {
+    tool = b.dataset.tool; selected = null;
+    document.querySelectorAll("[data-tool]").forEach(x => x.classList.toggle("on", x === b));
+  });
+  document.getElementById("undo").onclick = () => { const h = history.pop(); if (h) { nodes = h.nodes; members = h.members; save(); ui(); } };
+  document.getElementById("clear").onclick = () => { snapshot(); nodes = nodes.filter(n => n.fixed); members = []; save(); ui(); };
+  function snapshot() { history.push({ nodes: nodes.map(n => ({ ...n })), members: members.map(m => ({ ...m })) }); if (history.length > 60) history.shift(); }
+
+  function nodeAt(x, y, r = 0.45) {
+    let best = -1, bd = r;
+    nodes.forEach((n, i) => { const d = Math.hypot(n.x - x, n.y - y); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  function snap(x, y) { return [Math.round(x * 2) / 2, Math.round(y * 2) / 2]; }   // half-metre grid
+  function onLand(x, y) { const [a, b] = LEVELS[lvl].gap; return (x < a || x > b) && y <= 0.01; }
+
+  cv.addEventListener("pointermove", e => {
+    if (mode !== "edit") return;
+    const r = cv.getBoundingClientRect();
+    hover = snap(wx(e.clientX - r.left), wy(e.clientY - r.top));
+  });
+  cv.addEventListener("pointerleave", () => hover = null);
+  cv.addEventListener("pointerdown", e => {
+    if (mode !== "edit") return;
+    const r = cv.getBoundingClientRect();
+    const x = wx(e.clientX - r.left), y = wy(e.clientY - r.top);
+    if (tool === "erase") return erase(x, y);
+    const hit = nodeAt(x, y);
+    if (selected === null) {
+      if (hit >= 0) selected = hit; else msg("Start from a dot - a cliff anchor or a joint you already built.");
+      return;
+    }
+    if (hit === selected) { selected = null; return; }
+    let target = hit;
+    let [tx, ty] = hit >= 0 ? [nodes[hit].x, nodes[hit].y] : snap(x, y);
+    if (hit < 0) {
+      if (onLand(tx, ty) && ty < -0.01) return msg("That's inside the cliff.");
+      if (ty > WORLD_TOP - .5 || ty < WORLD_BOTTOM + .5 || tx < wx(0) || tx > wx(W)) return;
+    }
+    const len = Math.hypot(tx - nodes[selected].x, ty - nodes[selected].y);
+    if (len > MAX_LEN) return msg(`Too long (${len.toFixed(1)} m) - members can be at most 3 m.`);
+    if (len < 0.4) return;
+    snapshot();
+    if (target < 0) { nodes.push({ x: tx, y: ty, fixed: false }); target = nodes.length - 1; }
+    if (!members.some(m => (m.a === selected && m.b === target) || (m.b === selected && m.a === target)))
+      members.push({ a: selected, b: target, type: tool });
+    selected = target;          // keep drawing from the new joint
+    save(); ui();
+    msg("");
+  });
+
+  function erase(x, y) {
+    // closest member to the tap (distance from point to segment)
+    let best = -1, bd = 0.35;
+    members.forEach((m, i) => {
+      const a = nodes[m.a], b = nodes[m.b];
+      const t = Math.max(0, Math.min(1, ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / (L(a, b) ** 2)));
+      const d = Math.hypot(x - (a.x + t * (b.x - a.x)), y - (a.y + t * (b.y - a.y)));
+      if (d < bd) { bd = d; best = i; }
+    });
+    if (best < 0) return;
+    snapshot();
+    members.splice(best, 1);
+    // remove joints that no longer have any members (and re-index)
+    const used = new Set(members.flatMap(m => [m.a, m.b]));
+    const keep = nodes.map((n, i) => n.fixed || used.has(i));
+    const remap = []; let k = 0;
+    nodes = nodes.filter((n, i) => { remap[i] = k; if (keep[i]) k++; return keep[i]; });
+    members.forEach(m => { m.a = remap[m.a]; m.b = remap[m.b]; });
+    save(); ui();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Simulation: joints are point masses, members are stiff damped springs.
+  // Small explicit time steps (semi-implicit Euler) keep it stable.
+  // ---------------------------------------------------------------------------
+  function startSim() {
+    if (!members.some(m => m.type === "road")) return msg("Build some road first! 🛣️");
+    if (cost() > LEVELS[lvl].budget) return msg("Over budget - remove some members.");
+    const P = nodes.map(n => ({ x: n.x, y: n.y, vx: 0, vy: 0, fx: 0, fy: 0, m: 0, fixed: n.fixed }));
+    const M = members.map(m => {
+      const len = L(nodes[m.a], nodes[m.b]), mat = MAT[m.type];
+      P[m.a].m += mat.mass * len / 2; P[m.b].m += mat.mass * len / 2;
+      return { ...m, rest: len, k: mat.k / len, c: 2 * Math.sqrt(mat.k / len * 20), mat, force: 0, broken: false };
+    });
+    P.forEach(p => { if (!p.fixed && p.m < 1) p.m = 1; });
+    const [g0, g1] = LEVELS[lvl].gap;
+    sim = { P, M, car: { x: g0 - 2.2, y: 0, v: 0, onBridge: true, fall: 0, vy: 0 }, t: 0, result: null, settle: 1.2 };
+    mode = "run"; ui(); msg("Letting the bridge settle...");
+  }
+
+  function step(dt) {
+    const { P, M, car } = sim;
+    const [g0, g1] = LEVELS[lvl].gap, carM = LEVELS[lvl].car;
+    for (const p of P) { p.fx = 0; p.fy = -p.m * G; }
+    for (const m of M) {
+      if (m.broken) continue;
+      const a = P[m.a], b = P[m.b];
+      const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1e-9;
+      const ux = dx / len, uy = dy / len;
+      const relV = (b.vx - a.vx) * ux + (b.vy - a.vy) * uy;
+      const f = m.k * (len - m.rest) + m.c * relV;          // + = tension
+      m.force = m.k * (len - m.rest);
+      if (m.force > m.mat.tens || -m.force > m.mat.comp) { m.broken = true; continue; }
+      a.fx += f * ux; a.fy += f * uy; b.fx -= f * ux; b.fy -= f * uy;
+    }
+    // the car pushes down on the road member it is sitting on
+    if (sim.settle <= 0 && car.onBridge && car.x > g0 && car.x < g1) {
+      const r = roadUnder(car.x);
+      if (!r) { car.onBridge = false; }
+      else {
+        const { m, t } = r;
+        const W = carM * G;
+        P[m.a].fy -= W * (1 - t); P[m.b].fy -= W * t;
+        car.y = P[m.a].y + (P[m.b].y - P[m.a].y) * t;
+        car.ang = Math.atan2(P[m.b].y - P[m.a].y, P[m.b].x - P[m.a].x) * (P[m.b].x > P[m.a].x ? 1 : -1);
+      }
+    }
+    for (const p of P) {
+      if (p.fixed) continue;
+      p.vx += p.fx / p.m * dt; p.vy += p.fy / p.m * dt;
+      p.vx *= 0.9995; p.vy *= 0.9995;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+  }
+
+  // Find the intact road member under the car's x position; t is how far along it the car is.
+  function roadUnder(x) {
+    const { P, M } = sim;
+    let best = null;
+    for (const m of M) {
+      if (m.broken || m.type !== "road") continue;
+      const a = P[m.a], b = P[m.b];
+      const lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
+      if (x < lo - 1e-6 || x > hi + 1e-6 || hi - lo < 0.05) continue;
+      const t = (x - a.x) / (b.x - a.x);
+      const y = a.y + (b.y - a.y) * t;
+      if (!best || y > best.y) best = { m, t, y };   // drive on the top-most road
+    }
+    return best;
+  }
+
+  function update(frameDt) {
+    const sub = 60, slow = document.getElementById("slow").checked ? 0.3 : 1;
+    const dt = frameDt * slow / sub;
+    for (let i = 0; i < sub; i++) step(dt);
+    const { car } = sim, [g0, g1] = LEVELS[lvl].gap;
+    sim.t += frameDt * slow;
+    if (sim.settle > 0) { sim.settle -= frameDt * slow; if (sim.settle <= 0) msg("Here comes the car! 🚗"); return; }
+    if (sim.result) return;
+    if (car.onBridge) {
+      car.v = Math.min(3, car.v + 2 * frameDt * slow);
+      car.x += car.v * frameDt * slow;
+      if (car.x <= g0 || car.x >= g1) { car.y = 0; car.ang = 0; }
+      if (car.x > g1 + 2) win();
+      // the car also falls if the road under it has dropped far below the cliff level
+      if (car.y < WORLD_BOTTOM + 1) car.onBridge = false;
+    } else {
+      car.vy -= G * frameDt * slow; car.y += car.vy * frameDt * slow; car.x += car.v * 0.3 * frameDt * slow;
+      car.ang = (car.ang || 0) + 2 * frameDt * slow;
+      if (car.y < WORLD_BOTTOM - 1 && !sim.result) lose();
+    }
+  }
+
+  function win() {
+    sim.result = "win";
+    const c = cost(), b = LEVELS[lvl].budget;
+    const maxUse = Math.max(...sim.M.filter(m => !m.broken).map(m => m.force > 0 ? m.force / m.mat.tens : -m.force / m.mat.comp));
+    if (!done.includes(lvl)) { done.push(lvl); store.set("bridge-done", done); }
+    const best = store.get("bridge-best-" + lvl, null);
+    if (best === null || c < best) store.set("bridge-best-" + lvl, c);
+    msg(`🎉 It held! Cost D${c.toLocaleString()} (budget D${b.toLocaleString()}). Most loaded member at ${Math.round(maxUse * 100)}% of its strength.`);
+    ui();
+    if (lvl < LEVELS.length - 1) setTimeout(() => msg(document.getElementById("msg").textContent + "  Next level unlocked →"), 400);
+  }
+  function lose() { sim.result = "lose"; msg("💥 Splash! The bridge failed. Look at which members snapped - add triangles there."); }
+
+  document.getElementById("go").onclick = startSim;
+  document.getElementById("back").onclick = () => { mode = "edit"; sim = null; ui(); msg(""); };
+
+  // ---------------------------------------------------------------------------
+  // Drawing
+  // ---------------------------------------------------------------------------
+  function forceColour(m) {
+    const u = m.force > 0 ? m.force / m.mat.tens : -m.force / m.mat.comp;
+    const t = Math.min(1, u);
+    return m.force > 0 ? `rgb(${Math.round(90 - 43 * t)},${Math.round(160 - 49 * t)},${Math.round(90 + 124 * t)})`
+                       : `rgb(${Math.round(90 + 124 * t)},${Math.round(160 - 96 * t)},${Math.round(90 - 43 * t)})`;
+  }
+
+  function draw() {
+    const Lv = LEVELS[lvl], [g0, g1] = Lv.gap;
+    ctx.clearRect(0, 0, W, H);
+    // sky gradient + water
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#9fd3f0"); sky.addColorStop(1, "#e3f3fb");
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#3b8fc4"; ctx.fillRect(0, sy(-5.5), W, H);
+    ctx.fillStyle = "rgba(255,255,255,.25)";
+    for (let i = 0; i < 12; i++) ctx.fillRect(((i * 97 + performance.now() / 40) % W), sy(-5.7) + (i % 3) * 8, 26, 2);
+    // grid (edit mode)
+    if (mode === "edit") {
+      ctx.fillStyle = "rgba(20,40,60,.18)";
+      for (let x = Math.ceil(wx(0) * 2) / 2; x <= wx(W); x += 0.5) for (let y = WORLD_BOTTOM + 1; y <= WORLD_TOP - 1; y += 0.5) {
+        if (onLand(x, y) && y < 0) continue;
+        ctx.fillRect(sx(x) - 1, sy(y) - 1, 2, 2);
+      }
+    }
+    // cliffs
+    ctx.fillStyle = "#c9935a";
+    ctx.fillRect(0, sy(0), sx(g0), H); ctx.fillRect(sx(g1), sy(0), W - sx(g1), H);
+    ctx.fillStyle = "#7cb342";
+    ctx.fillRect(0, sy(0) - 6, sx(g0), 8); ctx.fillRect(sx(g1), sy(0) - 6, W - sx(g1), 8);
+    // a little Gambian flag on the far bank
+    const fx = sx(g1 + 1.6), fy = sy(0);
+    ctx.fillStyle = "#555"; ctx.fillRect(fx, fy - 2.2 * scale, 2, 2.2 * scale);
+    [["#ce1126", 0, .3], ["#fff", .3, .07], ["#0c1c8c", .37, .26], ["#fff", .63, .07], ["#3a7728", .7, .3]].forEach(([c, a, h]) => {
+      ctx.fillStyle = c; ctx.fillRect(fx + 2, fy - 2.2 * scale + a * .7 * scale, scale, h * .7 * scale); });
+    if (Lv.pier) { ctx.fillStyle = "#9e9e9e"; ctx.fillRect(sx(Lv.pier - .4), sy(-4), .8 * scale, H); }
+
+    const P = sim ? sim.P : nodes;
+    // members
+    const list = sim ? sim.M : members;
+    for (const m of list) {
+      if (m.broken) continue;
+      const a = P[m.a], b = P[m.b];
+      ctx.lineCap = "round";
+      ctx.lineWidth = m.type === "road" ? Math.max(5, scale * .22) : Math.max(3, scale * .1);
+      ctx.strokeStyle = sim ? forceColour(m) : (m.type === "road" ? "#3d3d3d" : "#b0702a");
+      ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke();
+      if (m.type === "road" && !sim) {
+        ctx.strokeStyle = "#f5d142"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 6]);
+        ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    // broken stubs
+    if (sim) for (const m of sim.M) if (m.broken) {
+      const a = P[m.a], b = P[m.b];
+      ctx.strokeStyle = "#d6402f"; ctx.lineWidth = 3;
+      [[a, b], [b, a]].forEach(([p, q]) => { ctx.beginPath(); ctx.moveTo(sx(p.x), sy(p.y)); ctx.lineTo(sx(p.x + (q.x - p.x) * .25), sy(p.y + (q.y - p.y) * .25)); ctx.stroke(); });
+    }
+    // joints
+    nodesDraw(P);
+    // preview line
+    if (mode === "edit" && selected !== null && hover) {
+      const a = nodes[selected], len = Math.hypot(hover[0] - a.x, hover[1] - a.y);
+      ctx.strokeStyle = len > MAX_LEN ? "rgba(214,64,47,.7)" : "rgba(0,0,0,.4)"; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+      ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(hover[0]), sy(hover[1])); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "#111"; ctx.font = "600 12px Inter, sans-serif"; ctx.fillText(`${len.toFixed(1)} m`, sx(hover[0]) + 8, sy(hover[1]) - 8);
+    }
+    // car
+    if (sim) drawCar(sim.car);
+  }
+
+  function nodesDraw(P) {
+    P.forEach((n, i) => {
+      ctx.beginPath(); ctx.arc(sx(n.x), sy(n.y), n.fixed ? 7 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = n.fixed ? "#ce1126" : "#fff"; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = "#222"; ctx.stroke();
+      if (mode === "edit" && i === selected) { ctx.beginPath(); ctx.arc(sx(n.x), sy(n.y), 12, 0, Math.PI * 2); ctx.strokeStyle = "#0c1c8c"; ctx.lineWidth = 3; ctx.stroke(); }
+    });
+  }
+
+  function drawCar(c) {
+    const big = LEVELS[lvl].car > 1000, w = (big ? 2.2 : 1.5) * scale, h = (big ? 1.0 : 0.6) * scale;
+    ctx.save();
+    ctx.translate(sx(c.x), sy(c.y) - Math.max(5, scale * .22) / 2);
+    ctx.rotate(-(c.ang || 0));
+    ctx.fillStyle = big ? "#e8a317" : "#ce1126";
+    ctx.fillRect(-w / 2, -h - .25 * scale, w, h);
+    ctx.fillStyle = "#cfe8ff"; ctx.fillRect(w * .05, -h - .15 * scale, w * .3, h * .5);
+    ctx.fillStyle = "#222";
+    [-w / 3, w / 3].forEach(x => { ctx.beginPath(); ctx.arc(x, -.2 * scale, .22 * scale, 0, Math.PI * 2); ctx.fill(); });
+    ctx.restore();
+  }
+
+  let last = 0;
+  function loop(t) {
+    const dt = Math.min(1 / 30, (t - last) / 1000 || 1 / 60); last = t;
+    if (mode === "run" && sim) update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  addEventListener("resize", resize);
+  resize();
+  loadLevel(Math.min(done.length, LEVELS.length - 1));
+  requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+// Gambian first names: [name, other spellings, origin, meaning].
+// Many Gambian names come from Arabic through Islam, with Wolof, Mandinka or Fula forms.
+// Meanings are the commonly given ones; families sometimes explain a name differently.
+// PK: add names and fix anything that's off - one line per name.
+const NAMES = [
+  // ----- boys -----
+  ["Lamin", "Lamine, Al-Amin", "Arabic (al-Amin)", "The trustworthy one - a title of the Prophet Muhammad."],
+  ["Ebrima", "Ebou, Ibrahima, Ibrahim", "Arabic (Ibrahim)", "Abraham - usually explained as 'father of many'."],
+  ["Modou", "Momodou, Mamadou, Muhammad", "Arabic (Muhammad)", "Praised, praiseworthy."],
+  ["Amadou", "Ahmad, Ahmadou", "Arabic (Ahmad)", "Most praised - another name of the Prophet."],
+  ["Ousman", "Usman, Uthman, Ousmane", "Arabic (Uthman)", "Named after Uthman, the third caliph of Islam."],
+  ["Alieu", "Ali, Aliou", "Arabic (Ali)", "High, exalted."],
+  ["Bakary", "Babucarr, Bubacarr, Abu Bakr", "Arabic (Abu Bakr)", "Named after Abu Bakr, the first caliph of Islam."],
+  ["Musa", "Moussa, Mousa", "Arabic (Musa)", "Moses, the prophet."],
+  ["Yusupha", "Yusuf, Youssouf, Joseph", "Arabic (Yusuf)", "Joseph - usually explained as 'God increases'."],
+  ["Omar", "Oumar, Umar", "Arabic (Umar)", "Flourishing, long-lived. Also the second caliph of Islam."],
+  ["Abdoulie", "Abdou, Abdullah, Abdoulaye", "Arabic (Abd Allah)", "Servant of God."],
+  ["Saikou", "Seikou, Sheikh", "Arabic (Shaykh)", "Elder, learned leader."],
+  ["Malick", "Malik, Maalik", "Arabic (Malik)", "King."],
+  ["Karim", "Karimo", "Arabic (Karim)", "Generous, noble."],
+  ["Habib", "Habibou", "Arabic (Habib)", "Beloved."],
+  ["Ismaila", "Ismail, Ismaël", "Arabic (Ismail)", "Ishmael - 'God hears'."],
+  ["Dawda", "Daouda, Dawud, David", "Arabic (Dawud)", "David - usually explained as 'beloved'."],
+  ["Sheriff", "Sherif, Sharif", "Arabic (Sharif)", "Noble, honourable."],
+  ["Assan", "Hassan, Hasan", "Arabic (Hasan)", "Good, handsome."],
+  ["Ousainou", "Hussein, Husayn, Ousseynou", "Arabic (Husayn)", "Good, handsome little one."],
+  ["Mustapha", "Mustafa, Moustapha", "Arabic (Mustafa)", "The chosen one."],
+  ["Tijan", "Tidiane, Tijani", "Arabic (al-Tijani)", "Named after Sheikh Ahmad al-Tijani, founder of the Tijaniyya Sufi order."],
+  ["Suleiman", "Sulayman, Solomon, Souleymane", "Arabic (Sulayman)", "Solomon - linked to 'peace'."],
+  ["Kebba", "Keba", "Mandinka", "Elder, big one - often given to a first son or a namesake of an elder."],
+  ["Pa", "Pa-", "Wolof / Gambian English", "Father - used before a name to show respect, or for a boy named after his grandfather."],
+  ["Dodou", "Doudou", "Wolof", "A popular Wolof name. Families explain it in different ways - ask your elders who you were named after!"],
+
+  // ----- girls -----
+  ["Fatou", "Fatoumata, Fatima, Fatim", "Arabic (Fatima)", "Named after Fatima, daughter of the Prophet. Often explained as 'one who abstains'."],
+  ["Isatou", "Aisha, Aissatou, Satou", "Arabic (Aisha)", "Alive, living."],
+  ["Mariama", "Mariam, Maryam, Mary", "Arabic (Maryam)", "Mary, the mother of Jesus."],
+  ["Awa", "Hawa, Eve", "Arabic (Hawwa)", "Eve - 'living'."],
+  ["Haddy", "Khadija, Kaddy, Kaddijatou, Adja", "Arabic (Khadija)", "Named after Khadija, the first wife of the Prophet. Often explained as 'early-born'."],
+  ["Binta", "Bintou", "Arabic (Bint)", "Daughter."],
+  ["Sainabou", "Zainab, Jainaba, Zeinab", "Arabic (Zaynab)", "Usually explained as 'fragrant flower'. Zaynab was a daughter of the Prophet."],
+  ["Aminata", "Amina, Ami, Amie", "Arabic (Amina)", "Trustworthy, faithful - the name of the Prophet's mother."],
+  ["Rohey", "Ruqayya, Rokhaya", "Arabic (Ruqayya)", "Named after Ruqayya, a daughter of the Prophet. Often explained as 'gentle'."],
+  ["Ramatoulie", "Rahmatoulaye, Rama", "Arabic (Rahmat Allah)", "The mercy of God."],
+  ["Nyima", "Ni'ma, Nema", "Arabic (Ni'ma)", "Blessing, grace."],
+  ["Oumie", "Umie, Oumi, Umm", "Arabic (Umm)", "Mother - often for a girl named after her grandmother."],
+  ["Ndey", "Ndeye, Ndèye", "Wolof", "Mother - often for a girl named after her grandmother."],
+  ["Salimatou", "Salimata, Salima", "Arabic (Salima)", "Safe, peaceful."],
+  ["Hajara", "Hagar, Hadjara", "Arabic (Hajar)", "Hagar, the mother of Ishmael."],
+  ["Musukebba", "Musu", "Mandinka", "Elder woman (musu = woman, keba = elder) - often for a girl named after her grandmother."],
+  ["Mam", "Maam", "Wolof", "Grandparent - used for a child named after a grandmother or grandfather."],
+];

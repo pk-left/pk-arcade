@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sky Over Banjul · PK Arcade</title>
+  <meta name="description" content="The stars, planets and moon above the Gambia right now.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌌</text></svg>">
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    body { background: #070b1f; color: #e8ecff; }
+    .topbar h1 { color: #fff; }
+    .muted { color: #9aa3c7; }
+    .wrap { display: grid; gap: 16px; }
+    @media (min-width: 900px) { .wrap { grid-template-columns: 1fr 300px; align-items: start; } }
+    #sky { width: 100%; aspect-ratio: 1; display: block; touch-action: manipulation; cursor: crosshair; }
+    .panel { background: #111833; border-radius: var(--radius); padding: 16px; }
+    .panel h3 { margin: 0 0 8px; color: #fff; }
+    .pl { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #222b52; font-size: .95rem; }
+    .pl:last-child { border-bottom: 0; }
+    .pl b { font-weight: 600; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .controls label { display: flex; align-items: center; gap: 6px; font-size: .9rem; }
+    input[type=range] { width: 100%; accent-color: #f5c542; }
+    .moon { display: flex; gap: 14px; align-items: center; }
+    #moonCv { width: 72px; height: 72px; }
+    .info { min-height: 1.4em; font-weight: 600; color: #f5c542; text-align: center; margin-top: 6px; }
+    .btn.ghost { color: #e8ecff; box-shadow: inset 0 0 0 2px #e8ecff; }
+    footer.site { color: #6c76a3; }
+  </style>
+</head>
+<body>
+  <div class="flag"></div>
+  <header class="topbar">
+    <a class="back" href="../">← Arcade</a>
+    <h1>Sky Over Banjul 🌌</h1>
+  </header>
+  <main>
+    <div class="controls">
+      <span id="when" style="font-weight:700"></span>
+      <span style="flex:1"></span>
+      <label><input type="checkbox" id="lines" checked> Constellations</label>
+      <label><input type="checkbox" id="names" checked> Names</label>
+      <button class="btn ghost" id="locBtn">📍 Use my location</button>
+    </div>
+    <div class="wrap">
+      <div>
+        <canvas id="sky"></canvas>
+        <div class="info" id="info">Tap a bright star or planet to see its name</div>
+        <input type="range" id="slider" min="-720" max="720" step="5" value="0" aria-label="Time offset">
+        <div class="row" style="justify-content:space-between">
+          <span class="muted" style="font-size:.85rem">−12 h</span>
+          <button class="btn ghost" id="nowBtn" style="padding:6px 16px">Now</button>
+          <span class="muted" style="font-size:.85rem">+12 h</span>
+        </div>
+      </div>
+      <div class="wrap" style="grid-template-columns:1fr">
+        <div class="panel">
+          <h3>Moon</h3>
+          <div class="moon"><canvas id="moonCv" width="144" height="144"></canvas><div id="moonTxt"></div></div>
+        </div>
+        <div class="panel">
+          <h3>Planets</h3>
+          <div id="planets"></div>
+        </div>
+        <div class="panel">
+          <h3>Sun</h3>
+          <div id="sunTxt"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer class="site">
+    Positions calculated with <a href="https://github.com/cosinekitty/astronomy">Astronomy Engine</a> (MIT) ·
+    star data from <a href="https://github.com/ofrohn/d3-celestial">d3-celestial</a> (BSD) / Hipparcos.
+  </footer>
+
+  <script src="astronomy.min.js"></script>
+  <script src="skydata.js"></script>
+  <script>
+  const A = Astronomy;
+  let place = { name: "Banjul", lat: 13.4549, lon: -16.5790 };
+  let observer = new A.Observer(place.lat, place.lon, 5);
+  let offsetMin = 0;
+  const cv = document.getElementById("sky"), ctx = cv.getContext("2d");
+  let S = 0, hits = [];
+
+  const PLANETS = [
+    ["Mercury", "#c9b8a6", "Mercury"], ["Venus", "#fff4c2", "Venus"], ["Mars", "#ff7a4f", "Mars"],
+    ["Jupiter", "#ffe0b0", "Jupiter"], ["Saturn", "#f0d98c", "Saturn"],
+  ];
+  const D2R = Math.PI / 180;
+
+  function resize() {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    S = r.width; cv.width = S * dpr; cv.height = S * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  // RA/Dec (degrees) -> altitude/azimuth (degrees) for the observer, using local sidereal time
+  function altAz(raDeg, decDeg, lstDeg) {
+    const ha = (lstDeg - raDeg) * D2R, dec = decDeg * D2R, lat = observer.latitude * D2R;
+    const sinAlt = Math.sin(dec) * Math.sin(lat) + Math.cos(dec) * Math.cos(lat) * Math.cos(ha);
+    const alt = Math.asin(sinAlt);
+    const cosAz = (Math.sin(dec) - Math.sin(alt) * Math.sin(lat)) / (Math.cos(alt) * Math.cos(lat));
+    let az = Math.acos(Math.max(-1, Math.min(1, cosAz)));
+    if (Math.sin(ha) > 0) az = 2 * Math.PI - az;
+    return [alt / D2R, az / D2R];
+  }
+
+  // Looking up at the sky: north at the top, EAST on the LEFT (like a planisphere)
+  function project(alt, az) {
+    const R = S / 2 - 18;
+    const r = R * (90 - alt) / 90;
+    return [S / 2 - r * Math.sin(az * D2R), S / 2 - r * Math.cos(az * D2R)];
+  }
+
+  function starColour(bv) {
+    if (bv < 0) return "#a9c4ff";
+    if (bv < 0.3) return "#d6e2ff";
+    if (bv < 0.6) return "#fffaf0";
+    if (bv < 1.0) return "#ffe9c4";
+    if (bv < 1.4) return "#ffd29a";
+    return "#ffb070";
+  }
+
+  function draw() {
+    if (!S) return;
+    const date = new Date(Date.now() + offsetMin * 60000);
+    const lst = ((A.SiderealTime(date) * 15 + observer.longitude) % 360 + 360) % 360;
+    const sunEq = A.Equator("Sun", date, observer, true, true);
+    const sun = A.Horizon(date, observer, sunEq.ra, sunEq.dec, "normal");
+    hits = [];
+
+    // background: night, twilight or day
+    const sa = sun.altitude;
+    const day = Math.max(0, Math.min(1, (sa + 12) / 18));   // 0 at -12 deg, 1 at +6 deg
+    ctx.clearRect(0, 0, S, S);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2 - 18, 0, Math.PI * 2); ctx.clip();
+    const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    g.addColorStop(0, mix("#0b1338", "#3f7fd6", day)); g.addColorStop(1, mix("#141d4a", "#8ab8ee", day));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+
+    // altitude rings
+    ctx.strokeStyle = "rgba(255,255,255,.07)"; ctx.lineWidth = 1;
+    [30, 60].forEach(a => { ctx.beginPath(); ctx.arc(S / 2, S / 2, (S / 2 - 18) * (90 - a) / 90, 0, Math.PI * 2); ctx.stroke(); });
+
+    const starAlpha = 1 - day * 0.85;
+    // constellation lines
+    if (document.getElementById("lines").checked) {
+      ctx.strokeStyle = `rgba(140,170,255,${0.35 * starAlpha})`; ctx.lineWidth = 1;
+      for (const id in SKYDATA.lines) for (const seg of SKYDATA.lines[id]) {
+        ctx.beginPath(); let pen = false;
+        for (const [ra, dec] of seg) {
+          const [alt, az] = altAz(ra, dec, lst);
+          if (alt < -2) { pen = false; continue; }
+          const [x, y] = project(alt, az);
+          pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true;
+        }
+        ctx.stroke();
+      }
+    }
+    // stars
+    for (const [ra, dec, mag, bv, name] of SKYDATA.stars) {
+      const [alt, az] = altAz(ra, dec, lst);
+      if (alt < 0) continue;
+      const [x, y] = project(alt, az);
+      const r = Math.max(0.5, 3.6 - mag * 0.7) * (S / 700 + 0.4);
+      ctx.globalAlpha = starAlpha * Math.min(1, 1.25 - mag / 6);
+      ctx.fillStyle = starColour(bv);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      if (name) hits.push({ x, y, label: `${name} (star, magnitude ${mag.toFixed(1)})` });
+    }
+    ctx.globalAlpha = 1;
+    // constellation names
+    if (document.getElementById("names").checked) {
+      ctx.fillStyle = `rgba(170,190,255,${0.55 * starAlpha})`;
+      ctx.font = `600 ${Math.max(9, S / 70)}px Inter, sans-serif`; ctx.textAlign = "center";
+      for (const id in SKYDATA.labels) {
+        const [name, ra, dec] = SKYDATA.labels[id];
+        const [alt, az] = altAz(ra, dec, lst);
+        if (alt < 8) continue;
+        const [x, y] = project(alt, az);
+        ctx.fillText(name.toUpperCase(), x, y);
+      }
+    }
+    // planets, moon and sun
+    const pinfo = [];
+    for (const [body, col, label] of PLANETS) {
+      const eq = A.Equator(body, date, observer, true, true);
+      const h = A.Horizon(date, observer, eq.ra, eq.dec, "normal");
+      const mag = A.Illumination(body, date).mag;
+      pinfo.push({ label, alt: h.altitude, az: h.azimuth, mag });
+      if (h.altitude < 0) continue;
+      const [x, y] = project(h.altitude, h.azimuth);
+      ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, 6 - mag) * (S / 700 + .4), 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#fff"; ctx.font = `700 ${Math.max(10, S / 55)}px Inter, sans-serif`; ctx.textAlign = "left";
+      ctx.fillText(label, x + 8, y - 6);
+      hits.push({ x, y, label: `${label} (planet, magnitude ${mag.toFixed(1)})` });
+    }
+    const moonEq = A.Equator("Moon", date, observer, true, true);
+    const moonH = A.Horizon(date, observer, moonEq.ra, moonEq.dec, "normal");
+    const phaseAngle = A.MoonPhase(date), frac = A.Illumination("Moon", date).phase_fraction;
+    if (moonH.altitude > -1) {
+      const [x, y] = project(moonH.altitude, moonH.azimuth);
+      drawMoon(ctx, x, y, Math.max(9, S / 40), phaseAngle);
+      hits.push({ x, y, label: `The Moon (${Math.round(frac * 100)}% lit)` });
+    }
+    if (sa > -1) {
+      const [x, y] = project(sa, sun.azimuth);
+      ctx.fillStyle = "#ffd84a"; ctx.shadowColor = "#ffd84a"; ctx.shadowBlur = 30;
+      ctx.beginPath(); ctx.arc(x, y, S / 32, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      hits.push({ x, y, label: "The Sun - don't look at it directly!" });
+    }
+    ctx.restore();
+
+    // horizon ring and compass points
+    ctx.strokeStyle = "#3a477d"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2 - 18, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#c8d0f5"; ctx.font = "700 14px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    [["N", 0], ["E", 90], ["S", 180], ["W", 270]].forEach(([l, az]) => {
+      const [x, y] = project(-9, az); ctx.fillText(l, x, y);
+    });
+    ctx.textBaseline = "alphabetic";
+
+    // side panels
+    document.getElementById("when").textContent =
+      `${place.name} · ${date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short", timeZone: "UTC" })} GMT`;
+    document.getElementById("planets").innerHTML = pinfo.map(p =>
+      `<div class="pl"><b>${p.label}</b><span class="${p.alt > 0 ? "" : "muted"}">${p.alt > 0 ? `up, ${Math.round(p.alt)}° high in the ${compass(p.az)}` : "below the horizon"}</span></div>`).join("");
+    const nextFull = A.SearchMoonPhase(180, date, 40), nextNew = A.SearchMoonPhase(0, date, 40);
+    document.getElementById("moonTxt").innerHTML = `<b>${phaseName(phaseAngle)}</b><br>${Math.round(frac * 100)}% lit · ${moonH.altitude > 0 ? "up now" : "not up"}<br>
+      <span class="muted">Full moon: ${fmtDate(nextFull)}<br>New moon: ${fmtDate(nextNew)}</span>`;
+    drawMoon(document.getElementById("moonCv").getContext("2d"), 72, 72, 62, phaseAngle, true);
+    const rise = A.SearchRiseSet("Sun", observer, +1, date, 1), set = A.SearchRiseSet("Sun", observer, -1, date, 1);
+    document.getElementById("sunTxt").innerHTML = `${sa > 0 ? "☀️ Up" : sa > -6 ? "🌅 Twilight" : "🌙 Night"} (${sa.toFixed(0)}°)<br>
+      <span class="muted">Next sunrise ${fmtTime(rise)} · next sunset ${fmtTime(set)} (GMT)</span>`;
+  }
+
+  function drawMoon(c, x, y, r, phase, big) {
+    // phase: 0 new, 90 first quarter, 180 full, 270 last quarter
+    if (big) c.clearRect(0, 0, 144, 144);
+    c.save();
+    c.fillStyle = "#2a2f45"; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    const k = Math.cos(phase * D2R);           // 1 new -> -1 full
+    const waxing = phase < 180;
+    c.fillStyle = "#f4f1e3";
+    c.beginPath();
+    // lit half (right side when waxing, as seen from the northern hemisphere)
+    c.arc(x, y, r, -Math.PI / 2, Math.PI / 2, !waxing);
+    // terminator ellipse
+    c.ellipse(x, y, Math.abs(k) * r, r, 0, Math.PI / 2, -Math.PI / 2, (k > 0) === waxing);
+    c.fill();
+    c.restore();
+  }
+
+  function phaseName(p) {
+    const names = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous", "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
+    return names[Math.round(p / 45) % 8];
+  }
+  const compass = az => ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][Math.round(az / 45) % 8];
+  const fmtDate = t => t ? t.date.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" }) : "-";
+  const fmtTime = t => t ? t.date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "-";
+  function mix(a, b, t) {
+    const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const [x, y] = [p(a), p(b)];
+    return "rgb(" + x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(",") + ")";
+  }
+
+  cv.addEventListener("click", e => {
+    const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    let best = null, bd = 22;
+    for (const h of hits) { const d = Math.hypot(h.x - mx, h.y - my); if (d < bd) { bd = d; best = h; } }
+    document.getElementById("info").textContent = best ? best.label : "Nothing bright there - try another dot";
+  });
+  document.getElementById("slider").oninput = e => { offsetMin = +e.target.value; draw(); };
+  document.getElementById("nowBtn").onclick = () => { offsetMin = 0; document.getElementById("slider").value = 0; draw(); };
+  document.getElementById("lines").onchange = draw;
+  document.getElementById("names").onchange = draw;
+  document.getElementById("locBtn").onclick = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      place = { name: "Your location", lat: pos.coords.latitude, lon: pos.coords.longitude };
+      observer = new A.Observer(place.lat, place.lon, 0);
+      draw();
+    }, () => alert("Couldn't get your location - showing Banjul."));
+  };
+  addEventListener("resize", resize);
+  resize();
+  setInterval(() => { if (offsetMin === 0) draw(); }, 30000);
+  </script>
+</body>
+</html>
