@@ -1,6 +1,9 @@
 # PK Arcade
 
-Free browser games made in the Gambia. Play at **https://pk-arcade.pages.dev**.
+
+browser games m
+
+a. Play at **https://pk-arcade.pages.dev**.
 
 Everything is plain HTML, CSS and JavaScript. There is no framework and no build step. The site installs to a phone's home screen and most of it works offline.
 
