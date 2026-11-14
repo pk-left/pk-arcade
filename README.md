@@ -1,6 +1,6 @@
 # 🎮 PK Arcade
 
-Free browser games and toys made in the Gambia 🇬🇲. Everything is plain **HTML, CSS and JavaScript**: there's no framework and no build step, and it's hosted on Netlify.
+Free browser games and toys made in the Gambia 🇬🇲. Everything is plain **HTML, CSS and JavaScript**: there's no framework and no build step, and it's hosted on Cloudflare Pages.
 
 | | Game | What it does | How it's built |
 |---|---|---|---|
@@ -24,7 +24,7 @@ python -m http.server 8000
 
 ## Deploy
 
-The repo is connected to Netlify, so every push to `main` redeploys automatically. `netlify.toml` sets the publish folder to the repo root.
+Hosted on **Cloudflare Pages**. There's no build command, and the output directory is the repo root. `_headers` sets security and caching headers, and `404.html` is the not-found page.
 
 ## Add content
 
