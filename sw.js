@@ -1,15 +1,15 @@
 // Service worker: keeps a copy of the site on the device so it opens with no data.
 // Strategy: answer from the saved copy straight away, and refresh that copy in the background,
 // so the next visit gets the newest version. Map tiles and other sites are never cached.
-const CACHE = "pk-arcade-v3";
-const PAGES = ["", "wordle/", "guess-the-place/", "ataya/", "bridge/", "dish-quiz/", "names/", "soundboard/", "sky/"];
+const CACHE = "pk-arcade-v4";
+const PAGES = ["", "guess-the-place/", "ataya/", "bridge/", "dish-quiz/", "names/", "soundboard/", "sky/"];
 const FILES = [
   ...PAGES.map(p => "/" + p),
   "/assets/style.css", "/assets/common.js", "/assets/theme.js", "/assets/icons.js",
   "/assets/fonts/press-start-2p.woff2", "/assets/fonts/vt323.woff2",
   "/assets/icons/icon.svg", "/assets/icons/icon-192.png",
   "/assets/leaflet/leaflet.js", "/assets/leaflet/leaflet.css",
-  "/wordle/words.js", "/guess-the-place/places.js", "/names/names.js",
+  "/guess-the-place/places.js", "/names/names.js",
   "/sky/astronomy.min.js", "/sky/skydata.js", "/manifest.webmanifest",
 ];
 

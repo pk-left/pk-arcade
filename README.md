@@ -1,15 +1,11 @@
 # PK Arcade
 
-
-browser games m
-
-a. Play at **https://pk-arcade.pages.dev**.
+Free browser games made in the Gambia. Play at **https://pk-arcade.pages.dev**.
 
 Everything is plain HTML, CSS and JavaScript. There is no framework and no build step. The site installs to a phone's home screen and most of it works offline.
 
 | Game | What it does | How it's built |
 |---|---|---|
-| **[Wolof Wordle](wordle/)** | Guess the 5-letter Wolof word in 6 tries. A daily word for everyone, plus a practice mode | Seeded daily word, two-pass letter scoring (handles repeated letters), streaks in `localStorage` |
 | **[Guess the Place](guess-the-place/)** | *Name it*: see a Gambian town from space and pick its name. *Pin it*: get a name and drop a pin on the map | [Leaflet](https://leafletjs.com) with Esri satellite tiles; distance scoring |
 | **[Ataya Master](ataya/)** | Pour tea between two glasses to build the foam. Pour from higher for more foam, but your hand shakes. Three levels, including a Harmattan wind | Low-resolution canvas scaled up for the pixel look; foam and spill model tuned with a simulation |
 | **[Bridge Builder](bridge/)** | Build a truss across six gaps, send a car over, and watch the forces | Mass-spring physics, 60 substeps per frame; members snap in tension or compression; every level solved by an automatic test |
@@ -40,12 +36,11 @@ Hosted on Cloudflare Pages, connected to this repo. Every push to `main` goes li
 
 ## Add content
 
-- `wordle/words.js`: Wolof words and meanings
 - `guess-the-place/places.js`: places, coordinates and facts
 - `names/names.js`: names, other spellings, origins and meanings
 - `bridge/index.html`: the `LEVELS` list at the top
 
-Spot a wrong Wolof spelling or name meaning? [Open an issue](https://github.com/pk-left/pk-arcade/issues).
+Spot a wrong name meaning? [Open an issue](https://github.com/pk-left/pk-arcade/issues).
 
 ## Credits
 

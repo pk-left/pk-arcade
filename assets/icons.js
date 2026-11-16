@@ -1,8 +1,5 @@
 // 12 x 12 pixel art for each game. Letters pick theme colours (see PIXEL_COLOURS in common.js).
 const GAME_ICONS = {
-  wordle: [
-    "............", ".ggg.yyy.mmm", ".ggg.yyy.mmm", ".ggg.yyy.mmm", "............", ".mmm.ggg.yyy",
-    ".mmm.ggg.yyy", ".mmm.ggg.yyy", "............", ".ggg.ggg.ggg", ".ggg.ggg.ggg", ".ggg.ggg.ggg"],
   place: [
     "....rrrr....", "...rrrrrr...", "..rrriirrr..", "..rriiiirr..", "..rrriirrr..", "...rrrrrr...",
     "....rrrr....", ".....rr.....", ".....rr.....", "..gggbbggg..", ".ggbbbbbbgg.", "............"],

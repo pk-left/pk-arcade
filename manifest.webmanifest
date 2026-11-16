@@ -1,7 +1,7 @@
 {
   "name": "PK Arcade",
   "short_name": "PK Arcade",
-  "description": "Free games made in the Gambia: Wolof Wordle, Guess the Place, Ataya Master, Bridge Builder and more.",
+  "description": "Free games made in the Gambia: Guess the Place, Ataya Master, Bridge Builder and more.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
